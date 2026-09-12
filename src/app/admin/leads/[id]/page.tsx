@@ -82,6 +82,7 @@ export default async function LeadDetailPage({
     await updateLeadDetails({
       leadId: id,
       email: String(formData.get("email") || "") || undefined,
+      address: String(formData.get("address") || "") || undefined,
       requirementNotes: String(formData.get("requirementNotes") || "") || undefined,
     });
   }
@@ -163,6 +164,10 @@ export default async function LeadDetailPage({
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" name="email" type="email" defaultValue={lead.email ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leadAddress">Address</Label>
+              <Textarea id="leadAddress" name="address" defaultValue={lead.address ?? ""} placeholder="Customer address, shown on estimates" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="requirementNotes">Customer requirements</Label>
@@ -309,7 +314,7 @@ export default async function LeadDetailPage({
             <form action={convertAction} className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="address">Site address</Label>
-                <Input id="address" name="address" />
+                <Input id="address" name="address" defaultValue={lead.address ?? ""} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="systemSizeKw">System size (kW)</Label>

@@ -32,6 +32,16 @@ export default async function EstimatePrintPage({
       <div className="border bg-background p-8 print:border-0 print:p-0">
         <div className="border-b-4 border-primary pb-4 text-center">
           <h1 className="text-2xl font-bold uppercase tracking-wide">{estimate.tenant.name}</h1>
+          {estimate.tenant.businessAddress && (
+            <p className="mt-1 text-sm">{estimate.tenant.businessAddress}</p>
+          )}
+          <p className="mt-1 text-sm font-medium">
+            {estimate.tenant.gstin && <span className="text-destructive">GST NO: {estimate.tenant.gstin}</span>}
+            {estimate.tenant.gstin && (estimate.tenant.contactPhone || estimate.tenant.contactEmail) ? " | " : ""}
+            {estimate.tenant.contactPhone && `PHONE: ${estimate.tenant.contactPhone}`}
+            {estimate.tenant.contactPhone && estimate.tenant.contactEmail ? " | " : ""}
+            {estimate.tenant.contactEmail && `EMAIL: ${estimate.tenant.contactEmail}`}
+          </p>
         </div>
 
         <h2 className="mt-4 text-center text-lg font-semibold underline">Solar System Estimate</h2>
@@ -52,6 +62,12 @@ export default async function EstimatePrintPage({
               </td>
               <td className="border bg-muted/50 p-2 font-semibold">Estimate Date</td>
               <td className="border p-2">{estimate.createdAt.toLocaleDateString("en-IN")}</td>
+            </tr>
+            <tr>
+              <td className="border bg-muted/50 p-2 font-semibold">Customer Address</td>
+              <td className="border p-2" colSpan={3}>
+                {estimate.lead.address || "—"}
+              </td>
             </tr>
             <tr>
               <td className="border bg-muted/50 p-2 font-semibold">System Size</td>

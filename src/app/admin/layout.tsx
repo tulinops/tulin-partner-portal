@@ -20,6 +20,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <Link href="/admin/leads">Leads</Link>
             <Link href="/admin/inventory">Inventory</Link>
             <Link href="/admin/connections">Connections</Link>
+            <Link href="/admin/settings">Business Profile</Link>
           </nav>
           <form action={logoutAction}>
             <Button variant="ghost" size="sm" type="submit">

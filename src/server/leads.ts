@@ -50,6 +50,7 @@ export async function createLead(input: {
 export async function updateLeadDetails(input: {
   leadId: string;
   email?: string;
+  address?: string;
   requirementNotes?: string;
 }) {
   const { db } = await getTenantDb();
@@ -58,7 +59,7 @@ export async function updateLeadDetails(input: {
 
   await db.lead.update({
     where: { id: input.leadId },
-    data: { email: input.email, requirementNotes: input.requirementNotes },
+    data: { email: input.email, address: input.address, requirementNotes: input.requirementNotes },
   });
   revalidatePath(`/admin/leads/${input.leadId}`);
 }

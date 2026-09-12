@@ -15,13 +15,19 @@ enum BusinessType {
 }
 
 model Tenant {
-  id           String       @id @default(cuid())
-  name         String
-  slug         String       @unique
-  businessType BusinessType @default(SOLAR)
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  name            String
+  slug            String       @unique
+  businessType    BusinessType @default(SOLAR)
+  isActive        Boolean      @default(true)
+  // Letterhead details for printed estimates — edited by the tenant Admin
+  // via the Business Profile page, not by Super Admin at onboarding time.
+  businessAddress String?
+  gstin           String?
+  contactPhone    String?
+  contactEmail    String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
   users               User[]
   leads               Lead[]
@@ -81,6 +87,7 @@ model Lead {
   customerName     String
   phone            String
   email            String?
+  address          String?    // customer address, shown on estimates and carried into the Connection on conversion
   requirementNotes String?    // free text the Admin fills in manually from the customer conversation
   source           LeadSource @default(OTHER)
   stage            LeadStage  @default(NEW)
