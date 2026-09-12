@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Tulin Partner Portal
 
-## Getting Started
+Multi-tenant ops portal for Tulin-affiliated businesses (proprietors/partners). Two roles: **Super Admin** (Tulin — onboards tenants, sees metadata only) and **Admin** (a tenant, e.g. a solar installation business — scoped to their own leads, inventory, connections/installations, and finance).
 
-First, run the development server:
+See `/Users/naveen/.claude/plans/we-have-given-the-velvety-harp.md` for the full design (data model, multi-tenant isolation strategy, auth design, phased scope).
+
+## Local setup
 
 ```bash
+npm install
+npm run db:up        # starts Postgres in Docker on host port 5433
+npm run db:migrate    # applies the committed migration
+npm run db:seed       # creates the Super Admin + a demo tenant/admin — prints credentials to the console
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open http://localhost:3000/login. Use the credentials printed by `db:seed` (a fresh random password is generated each run — read it from the terminal output, it is not stored anywhere).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+If you already run Postgres natively on port 5432, this won't conflict — the Docker container is mapped to `5433` (see `docker-compose.yml` / `.env.example`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Verification scripts
 
-## Learn More
+```bash
+npm run verify:isolation   # confirms tenant data never leaks across tenants
+npm run verify:flows       # exercises lead -> connection -> inventory -> payment -> profit end-to-end
+```
 
-To learn more about Next.js, take a look at the following resources:
+Both expect a migrated dev database (`db:up` + `db:migrate` first).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Other scripts
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `npm run build` / `npm run lint` — production build / lint check
+- `npm run db:studio` — Prisma Studio, a GUI for browsing the local database
 
-## Deploy on Vercel
+## Known gaps (Phase 1)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+No team-member logins (installation staff are plain data, not accounts), no customer-facing view, no email delivery for temp passwords (shown once in the UI — relay out-of-band), no automated test suite beyond the two verification scripts above.
