@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tulin
+      POSTGRES_PASSWORD: tulin_dev
+      POSTGRES_DB: tulin_partner_portal
+    ports:
+      # Host port 5433 (not 5432) to avoid clashing with any local Postgres install
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
