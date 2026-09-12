@@ -1,8 +1,20 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
-import type { ConnectionStatus, SubsidyStatus } from "@/generated/prisma/enums";
+import type {
+  ConnectionStatus,
+  SubsidyStatus,
+  SiteVisitStatus,
+  SiteVisitResult,
+  RoofType,
+  RoofCondition,
+  RoofAccess,
+  SitePhotoCategory,
+} from "@/generated/prisma/enums";
 
 export async function listConnections() {
   const { db } = await getTenantDb();
@@ -20,6 +32,8 @@ export async function getConnectionDetail(connectionId: string) {
       lead: { include: { estimates: { orderBy: { version: "desc" } } } },
       payments: { orderBy: { paidAt: "desc" } },
       inventoryTxns: { include: { inventoryItem: true }, orderBy: { createdAt: "desc" } },
+      staffMember: true,
+      sitePhotos: { orderBy: { uploadedAt: "desc" } },
     },
   });
   if (!connection) return null;
@@ -91,11 +105,11 @@ export async function updateConnectionStatus(input: {
   revalidatePath("/admin/connections");
 }
 
-export async function recordSiteInspection(input: {
+export async function assignSiteVisit(input: {
   connectionId: string;
-  siteInspectionDate: Date;
-  siteInspectorName: string;
-  siteInspectionNotes?: string;
+  staffMemberId?: string;
+  scheduledAt?: Date;
+  instructions?: string;
 }) {
   const { db } = await getTenantDb();
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
@@ -104,14 +118,128 @@ export async function recordSiteInspection(input: {
   await db.connection.update({
     where: { id: input.connectionId },
     data: {
-      siteInspectionDate: input.siteInspectionDate,
-      siteInspectorName: input.siteInspectorName,
-      siteInspectionNotes: input.siteInspectionNotes,
-      // Convenience nudge only — the Admin can still override via the status card.
-      status: connection.status === "SITE_INSPECTION_PENDING" ? "SITE_INSPECTION_DONE" : connection.status,
+      staffMemberId: input.staffMemberId,
+      siteVisitScheduledAt: input.scheduledAt,
+      siteVisitInstructions: input.instructions,
+      // Convenience nudge only — the Admin can still override via the status select.
+      siteVisitStatus: connection.siteVisitStatus === "PENDING" ? "SCHEDULED" : connection.siteVisitStatus,
     },
   });
   revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+export async function updateSiteVisitStatus(input: { connectionId: string; status: SiteVisitStatus }) {
+  const { db } = await getTenantDb();
+  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
+  if (!connection) throw new Error("Connection not found");
+
+  // Convenience nudge only — the Admin can still override via the overall status card.
+  const nextConnectionStatus =
+    input.status === "COMPLETED" && connection.status === "SITE_INSPECTION_PENDING"
+      ? "SITE_INSPECTION_DONE"
+      : connection.status;
+
+  await db.connection.update({
+    where: { id: input.connectionId },
+    data: {
+      siteVisitStatus: input.status,
+      status: nextConnectionStatus,
+    },
+  });
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+export async function recordPropertyInspection(input: {
+  connectionId: string;
+  roofType?: RoofType;
+  roofCondition?: RoofCondition;
+  roofAreaSqft?: number;
+  shadowObstruction?: string;
+  orientation?: string;
+  roofAccess?: RoofAccess;
+  electricalConnectionDetails?: string;
+  meterInformation?: string;
+  otherSiteRequirements?: string;
+}) {
+  const { db } = await getTenantDb();
+  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
+  if (!connection) throw new Error("Connection not found");
+
+  await db.connection.update({
+    where: { id: input.connectionId },
+    data: {
+      roofType: input.roofType,
+      roofCondition: input.roofCondition,
+      roofAreaSqft: input.roofAreaSqft,
+      shadowObstruction: input.shadowObstruction,
+      orientation: input.orientation,
+      roofAccess: input.roofAccess,
+      electricalConnectionDetails: input.electricalConnectionDetails,
+      meterInformation: input.meterInformation,
+      otherSiteRequirements: input.otherSiteRequirements,
+    },
+  });
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+export async function recordSiteVisitResult(input: {
+  connectionId: string;
+  result: SiteVisitResult;
+  workerNotes?: string;
+}) {
+  const { db } = await getTenantDb();
+  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
+  if (!connection) throw new Error("Connection not found");
+
+  await db.connection.update({
+    where: { id: input.connectionId },
+    data: {
+      siteVisitResult: input.result,
+      siteVisitWorkerNotes: input.workerNotes,
+    },
+  });
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
+
+export async function uploadSitePhoto(formData: FormData) {
+  const { db, tenantId } = await getTenantDb();
+  const connectionId = String(formData.get("connectionId") || "");
+  const category = String(formData.get("category") || "") as SitePhotoCategory;
+  const file = formData.get("file");
+
+  const connection = await db.connection.findFirst({ where: { id: connectionId } });
+  if (!connection) throw new Error("Connection not found");
+
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("No file provided");
+  }
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Only image files are allowed");
+  }
+  if (file.size > MAX_PHOTO_BYTES) {
+    throw new Error("Image is too large (max 8MB)");
+  }
+
+  const ext = path.extname(file.name) || ".jpg";
+  const fileName = `${randomUUID()}${ext}`;
+  const relativeDir = path.join("uploads", tenantId, connectionId);
+  const uploadDir = path.join(process.cwd(), "public", relativeDir);
+  await mkdir(uploadDir, { recursive: true });
+  const bytes = Buffer.from(await file.arrayBuffer());
+  await writeFile(path.join(uploadDir, fileName), bytes);
+
+  await db.sitePhoto.create({
+    data: {
+      tenantId,
+      connectionId,
+      category,
+      filePath: path.join(relativeDir, fileName).split(path.sep).join("/"),
+      originalName: file.name,
+    },
+  });
+  revalidatePath(`/admin/connections/${connectionId}`);
 }
 
 export async function updateDocumentVerification(input: {

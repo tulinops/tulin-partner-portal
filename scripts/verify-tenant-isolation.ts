@@ -79,11 +79,26 @@ async function main() {
   const estimatesSeenByA = await dbA.estimate.findMany({});
   assert(estimatesSeenByA.length === 1, `expected A to see 1 estimate, saw ${estimatesSeenByA.length}`);
 
+  // 5. SitePhoto model (added for the site-visit stage) must be tenant-scoped
+  // too — same regression risk as Estimate above.
+  const photoA = await dbA.sitePhoto.create({
+    data: {
+      tenantId: tenantA.id,
+      connectionId: convertedConnection.id,
+      category: "ROOF",
+      filePath: `uploads/${tenantA.id}/${convertedConnection.id}/test.jpg`,
+      originalName: "test.jpg",
+    },
+  });
+  const bSeesAPhoto = await dbB.sitePhoto.findFirst({ where: { id: photoA.id } });
+  assert(bSeesAPhoto === null, "tenant B could read tenant A's site photo — ISOLATION BROKEN");
+
   console.log("All tenant isolation checks passed.");
 
   // Clean up in dependency order so this script is safe to re-run against a
   // shared dev database without leaving orphan test tenants behind.
   for (const tenantId of [tenantA.id, tenantB.id]) {
+    await basePrisma.sitePhoto.deleteMany({ where: { tenantId } });
     await basePrisma.connection.deleteMany({ where: { tenantId } });
     await basePrisma.estimate.deleteMany({ where: { tenantId } });
     await basePrisma.lead.deleteMany({ where: { tenantId } });

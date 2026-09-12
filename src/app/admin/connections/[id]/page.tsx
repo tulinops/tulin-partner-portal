@@ -4,12 +4,24 @@ import {
   getConnectionDetail,
   recordPayment,
   updateConnectionStatus,
-  recordSiteInspection,
+  assignSiteVisit,
+  updateSiteVisitStatus,
+  recordPropertyInspection,
+  recordSiteVisitResult,
   updateDocumentVerification,
   updateSubsidyApplication,
   updateWarranty,
 } from "@/server/connections";
 import { listInventoryItems, allocateToConnection } from "@/server/inventory";
+import { listStaffMembers } from "@/server/staff";
+import { SitePhotos } from "./site-photos";
+import type {
+  SiteVisitStatus,
+  SiteVisitResult,
+  RoofType,
+  RoofCondition,
+  RoofAccess,
+} from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +57,31 @@ const STATUSES = [
 
 const SUBSIDY_STATUSES = ["NOT_APPLIED", "APPLIED", "APPROVED", "REJECTED", "DISBURSED"] as const;
 
+const SITE_VISIT_STATUSES = [
+  "PENDING",
+  "ASSIGNED",
+  "SCHEDULED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "RESCHEDULE_REQUESTED",
+  "CANCELLED",
+] as const;
+
+const SITE_VISIT_RESULTS = [
+  "SUITABLE",
+  "SUITABLE_WITH_CONDITIONS",
+  "NOT_SUITABLE",
+  "REQUIRES_FURTHER_INSPECTION",
+] as const;
+
+const ROOF_TYPES = ["RCC", "TIN", "TILED", "OTHER"] as const;
+const ROOF_CONDITIONS = ["GOOD", "NEEDS_REPAIR", "POOR"] as const;
+const ROOF_ACCESS_OPTIONS = ["EASY", "LADDER_REQUIRED", "DIFFICULT"] as const;
+
+function datetimeLocalValue(d: Date | null | undefined) {
+  return d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+}
+
 function money(n: number) {
   return `₹${n.toLocaleString("en-IN")}`;
 }
@@ -63,6 +100,7 @@ export default async function ConnectionDetailPage({
   if (!detail) notFound();
   const { connection, amountCollected, allocatedCost, profit, documentsVerified, warrantyExpiryDate } = detail;
   const items = await listInventoryItems();
+  const staff = await listStaffMembers();
 
   async function allocateAction(formData: FormData) {
     "use server";
@@ -91,13 +129,47 @@ export default async function ConnectionDetailPage({
     });
   }
 
-  async function siteInspectionAction(formData: FormData) {
+  async function siteVisitAssignmentAction(formData: FormData) {
     "use server";
-    await recordSiteInspection({
+    const scheduledAt = formData.get("siteVisitScheduledAt");
+    await assignSiteVisit({
       connectionId: id,
-      siteInspectionDate: new Date(String(formData.get("siteInspectionDate"))),
-      siteInspectorName: String(formData.get("siteInspectorName") || ""),
-      siteInspectionNotes: String(formData.get("siteInspectionNotes") || "") || undefined,
+      staffMemberId: String(formData.get("staffMemberId") || "") || undefined,
+      scheduledAt: scheduledAt ? new Date(String(scheduledAt)) : undefined,
+      instructions: String(formData.get("siteVisitInstructions") || "") || undefined,
+    });
+    await updateSiteVisitStatus({
+      connectionId: id,
+      status: formData.get("siteVisitStatus") as SiteVisitStatus,
+    });
+  }
+
+  async function propertyInspectionAction(formData: FormData) {
+    "use server";
+    const roofType = String(formData.get("roofType") || "");
+    const roofCondition = String(formData.get("roofCondition") || "");
+    const roofAccess = String(formData.get("roofAccess") || "");
+    const roofAreaSqft = formData.get("roofAreaSqft");
+    await recordPropertyInspection({
+      connectionId: id,
+      roofType: roofType ? (roofType as RoofType) : undefined,
+      roofCondition: roofCondition ? (roofCondition as RoofCondition) : undefined,
+      roofAreaSqft: roofAreaSqft ? Number(roofAreaSqft) : undefined,
+      shadowObstruction: String(formData.get("shadowObstruction") || "") || undefined,
+      orientation: String(formData.get("orientation") || "") || undefined,
+      roofAccess: roofAccess ? (roofAccess as RoofAccess) : undefined,
+      electricalConnectionDetails: String(formData.get("electricalConnectionDetails") || "") || undefined,
+      meterInformation: String(formData.get("meterInformation") || "") || undefined,
+      otherSiteRequirements: String(formData.get("otherSiteRequirements") || "") || undefined,
+    });
+  }
+
+  async function siteVisitResultAction(formData: FormData) {
+    "use server";
+    await recordSiteVisitResult({
+      connectionId: id,
+      result: formData.get("result") as SiteVisitResult,
+      workerNotes: String(formData.get("workerNotes") || "") || undefined,
     });
   }
 
@@ -246,39 +318,196 @@ export default async function ConnectionDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Site inspection</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Site visit assignment
+            <Badge variant="secondary">{connection.siteVisitStatus.replace(/_/g, " ")}</Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={siteInspectionAction} className="grid gap-4 sm:grid-cols-3">
+          <form action={siteVisitAssignmentAction} className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="siteInspectionDate">Inspection date</Label>
+              <Label htmlFor="staffMemberId">Worker</Label>
+              <Select name="staffMemberId" defaultValue={connection.staffMemberId ?? undefined}>
+                <SelectTrigger id="staffMemberId">
+                  <SelectValue placeholder="Select a worker" />
+                </SelectTrigger>
+                <SelectContent>
+                  {staff.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                      {s.phone ? ` (${s.phone})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="siteVisitStatus">Status</Label>
+              <Select name="siteVisitStatus" defaultValue={connection.siteVisitStatus}>
+                <SelectTrigger id="siteVisitStatus">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SITE_VISIT_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="siteVisitScheduledAt">Visit date &amp; time</Label>
               <Input
-                id="siteInspectionDate"
-                name="siteInspectionDate"
-                type="date"
-                defaultValue={dateInputValue(connection.siteInspectionDate)}
-                required
+                id="siteVisitScheduledAt"
+                name="siteVisitScheduledAt"
+                type="datetime-local"
+                defaultValue={datetimeLocalValue(connection.siteVisitScheduledAt)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="siteInspectorName">Inspector name</Label>
-              <Input
-                id="siteInspectorName"
-                name="siteInspectorName"
-                defaultValue={connection.siteInspectorName ?? ""}
-                required
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Save inspection</Button>
-            </div>
-            <div className="space-y-2 sm:col-span-3">
-              <Label htmlFor="siteInspectionNotes">Notes (roof/site condition, shading, findings)</Label>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="siteVisitInstructions">Instructions for worker</Label>
               <Textarea
-                id="siteInspectionNotes"
-                name="siteInspectionNotes"
-                defaultValue={connection.siteInspectionNotes ?? ""}
+                id="siteVisitInstructions"
+                name="siteVisitInstructions"
+                defaultValue={connection.siteVisitInstructions ?? ""}
               />
+            </div>
+            <div>
+              <Button type="submit">Save assignment</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Site photos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SitePhotos connectionId={id} photos={connection.sitePhotos} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Property inspection</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={propertyInspectionAction} className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="roofType">Roof type</Label>
+              <Select name="roofType" defaultValue={connection.roofType ?? undefined}>
+                <SelectTrigger id="roofType">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROOF_TYPES.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="roofCondition">Roof condition</Label>
+              <Select name="roofCondition" defaultValue={connection.roofCondition ?? undefined}>
+                <SelectTrigger id="roofCondition">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROOF_CONDITIONS.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="roofAreaSqft">Available roof area (sq. ft)</Label>
+              <Input
+                id="roofAreaSqft"
+                name="roofAreaSqft"
+                type="number"
+                step="0.01"
+                defaultValue={connection.roofAreaSqft?.toString() ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="shadowObstruction">Shadow / obstruction</Label>
+              <Input id="shadowObstruction" name="shadowObstruction" defaultValue={connection.shadowObstruction ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="orientation">Direction / orientation</Label>
+              <Input id="orientation" name="orientation" defaultValue={connection.orientation ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="roofAccess">Access to roof</Label>
+              <Select name="roofAccess" defaultValue={connection.roofAccess ?? undefined}>
+                <SelectTrigger id="roofAccess">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROOF_ACCESS_OPTIONS.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="electricalConnectionDetails">Electrical connection details</Label>
+              <Input
+                id="electricalConnectionDetails"
+                name="electricalConnectionDetails"
+                defaultValue={connection.electricalConnectionDetails ?? ""}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="meterInformation">Meter information</Label>
+              <Input id="meterInformation" name="meterInformation" defaultValue={connection.meterInformation ?? ""} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="otherSiteRequirements">Other requirements</Label>
+              <Input
+                id="otherSiteRequirements"
+                name="otherSiteRequirements"
+                defaultValue={connection.otherSiteRequirements ?? ""}
+              />
+            </div>
+            <div className="sm:col-span-3">
+              <Button type="submit">Save inspection details</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Site visit result</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={siteVisitResultAction} className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              {SITE_VISIT_RESULTS.map((r) => (
+                <Button
+                  key={r}
+                  type="submit"
+                  name="result"
+                  value={r}
+                  variant={r === connection.siteVisitResult ? "default" : "outline"}
+                  size="sm"
+                >
+                  {r.replace(/_/g, " ")}
+                </Button>
+              ))}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workerNotes">Worker notes</Label>
+              <Textarea id="workerNotes" name="workerNotes" defaultValue={connection.siteVisitWorkerNotes ?? ""} />
             </div>
           </form>
         </CardContent>

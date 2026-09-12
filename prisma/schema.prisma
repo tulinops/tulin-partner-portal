@@ -38,6 +38,7 @@ model Tenant {
   customerPayments    CustomerPayment[]
   staffMembers        StaffMember[]
   leadNotes           LeadNote[]
+  sitePhotos          SitePhoto[]
 }
 
 enum Role {
@@ -222,6 +223,50 @@ enum SubsidyStatus {
   DISBURSED
 }
 
+enum SiteVisitStatus {
+  PENDING
+  ASSIGNED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  RESCHEDULE_REQUESTED
+  CANCELLED
+}
+
+enum SiteVisitResult {
+  SUITABLE
+  SUITABLE_WITH_CONDITIONS
+  NOT_SUITABLE
+  REQUIRES_FURTHER_INSPECTION
+}
+
+enum RoofType {
+  RCC
+  TIN
+  TILED
+  OTHER
+}
+
+enum RoofCondition {
+  GOOD
+  NEEDS_REPAIR
+  POOR
+}
+
+enum RoofAccess {
+  EASY
+  LADDER_REQUIRED
+  DIFFICULT
+}
+
+enum SitePhotoCategory {
+  ROOF
+  METER
+  INSTALL_AREA
+  DB_PANEL
+  OTHER
+}
+
 model Connection {
   id                String           @id @default(cuid())
   tenantId          String
@@ -238,10 +283,22 @@ model Connection {
   staffMemberId     String?
   staffMember       StaffMember?     @relation(fields: [staffMemberId], references: [id])
 
-  // Site inspection
-  siteInspectionDate  DateTime?
-  siteInspectorName   String?
-  siteInspectionNotes String?
+  // Site visit
+  siteVisitStatus             SiteVisitStatus @default(PENDING)
+  siteVisitScheduledAt        DateTime?
+  siteVisitInstructions       String?
+  roofType                    RoofType?
+  roofCondition               RoofCondition?
+  roofAreaSqft                Decimal?        @db.Decimal(8, 2)
+  shadowObstruction           String?
+  orientation                 String?
+  roofAccess                  RoofAccess?
+  electricalConnectionDetails String?
+  meterInformation            String?
+  otherSiteRequirements       String?
+  siteVisitResult             SiteVisitResult?
+  siteVisitWorkerNotes        String?
+  sitePhotos                  SitePhoto[]
 
   // Document verification — fixed checklist for the standard PM Surya Ghar subsidy docs
   docIdProofVerified         Boolean @default(false)
@@ -284,6 +341,20 @@ model CustomerPayment {
   amount       Decimal    @db.Decimal(12, 2)
   paidAt       DateTime   @default(now())
   note         String?
+
+  @@index([tenantId, connectionId])
+}
+
+model SitePhoto {
+  id           String            @id @default(cuid())
+  tenantId     String
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  connectionId String
+  connection   Connection        @relation(fields: [connectionId], references: [id])
+  category     SitePhotoCategory
+  filePath     String // path relative to /public, e.g. "uploads/<tenantId>/<connectionId>/<uuid>.jpg"
+  originalName String
+  uploadedAt   DateTime          @default(now())
 
   @@index([tenantId, connectionId])
 }

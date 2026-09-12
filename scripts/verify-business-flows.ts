@@ -179,12 +179,12 @@ async function main() {
     `expected default status SITE_INSPECTION_PENDING, got ${pipelineConnection.status}`,
   );
 
-  // Mirrors recordSiteInspection's "nudge status forward" convenience.
+  // Mirrors updateSiteVisitStatus's "nudge status forward" convenience.
   await db.connection.update({
     where: { id: pipelineConnection.id },
     data: {
-      siteInspectionDate: new Date(),
-      siteInspectorName: "Test Inspector",
+      siteVisitStatus: "COMPLETED",
+      siteVisitResult: "SUITABLE",
       status: "SITE_INSPECTION_DONE",
     },
   });

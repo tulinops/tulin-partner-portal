@@ -89,6 +89,16 @@ async function main() {
     });
   }
 
+  const existingStaff = await prisma.staffMember.count({ where: { tenantId: tenant.id } });
+  if (existingStaff === 0) {
+    await prisma.staffMember.createMany({
+      data: [
+        { tenantId: tenant.id, name: "Ramu Chowdary", phone: "9876511001" },
+        { tenantId: tenant.id, name: "Suresh Naidu", phone: "9876511002" },
+      ],
+    });
+  }
+
   console.log("Seed complete.");
   console.log(`Super Admin login: ${superAdminEmail} / ${superAdminPassword}`);
   console.log(`Demo tenant Admin login: ${demoAdminEmail} / ${demoAdminPassword}`);

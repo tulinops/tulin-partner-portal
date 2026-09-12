@@ -25,6 +25,7 @@ const TENANT_SCOPED_MODELS = new Set([
   "Connection",
   "CustomerPayment",
   "StaffMember",
+  "SitePhoto",
 ]);
 
 const READ_OPS = new Set([
