@@ -107,10 +107,148 @@ async function main() {
 
   console.log("All business flow checks passed (lead->connection, weighted-avg cost, allocation, payment, profit).");
 
+  // --- Estimate lifecycle (mirrors src/server/leads.ts createEstimate) ---
+  const estimateLead = await db.lead.create({
+    data: {
+      tenantId: tenant.id,
+      customerName: "Estimate Customer",
+      phone: "888",
+      email: "estimate.customer@example.com",
+      requirementNotes: "3kW rooftop, wants lowest monthly bill",
+      source: "INSTAGRAM",
+    },
+  });
+
+  async function createEstimate(items: { description: string; qty: number; rate: number }[], gstPercent: number) {
+    const lineItems = items.map((li) => ({ ...li, amount: li.qty * li.rate }));
+    const subtotal = lineItems.reduce((s, li) => s + li.amount, 0);
+    const gstAmount = subtotal * (gstPercent / 100);
+    const totalAmount = subtotal + gstAmount;
+    return db.$transaction(async (tx) => {
+      const prior = await tx.estimate.count({ where: { leadId: estimateLead.id } });
+      await tx.estimate.updateMany({ where: { leadId: estimateLead.id }, data: { isCurrent: false } });
+      return tx.estimate.create({
+        data: {
+          tenantId: tenant.id,
+          leadId: estimateLead.id,
+          estimateNumber: `TEST/2026-2027/${Date.now()}-${prior}`,
+          version: prior + 1,
+          isCurrent: true,
+          lineItems,
+          subtotal,
+          gstPercent,
+          gstAmount,
+          totalAmount,
+          subsidyEstimate: 78000,
+        },
+      });
+    });
+  }
+
+  const estimateV1 = await createEstimate([{ description: "Panel", qty: 6, rate: 10000 }], 5);
+  assert(Number(estimateV1.subtotal) === 60000, `expected subtotal 60000, got ${estimateV1.subtotal}`);
+  assert(Number(estimateV1.gstAmount) === 3000, `expected GST 3000, got ${estimateV1.gstAmount}`);
+  assert(Number(estimateV1.totalAmount) === 63000, `expected total 63000, got ${estimateV1.totalAmount}`);
+  assert(estimateV1.version === 1 && estimateV1.isCurrent, "expected v1 to be current");
+
+  const estimateV2 = await createEstimate([{ description: "Panel", qty: 8, rate: 10000 }], 5);
+  assert(estimateV2.version === 2, `expected v2, got version ${estimateV2.version}`);
+
+  const v1Reloaded = await db.estimate.findFirst({ where: { id: estimateV1.id } });
+  assert(v1Reloaded!.isCurrent === false, "expected v1 to flip isCurrent=false after v2 created");
+  const v2Reloaded = await db.estimate.findFirst({ where: { id: estimateV2.id } });
+  assert(v2Reloaded!.isCurrent === true, "expected v2 to be current");
+
+  console.log("Estimate versioning checks passed (subtotal/GST/total calc, isCurrent flip).");
+
+  // --- Post-Won pipeline: site inspection -> document verification -> subsidy -> warranty ---
+  const pipelineConnection = await db.$transaction(async (tx) => {
+    await tx.lead.update({ where: { id: estimateLead.id }, data: { stage: "WON" } });
+    return tx.connection.create({
+      data: {
+        tenantId: tenant.id,
+        leadId: estimateLead.id,
+        customerName: "Estimate Customer",
+        phone: "888",
+        systemSizeKw: 3,
+      },
+    });
+  });
+  assert(
+    pipelineConnection.status === "SITE_INSPECTION_PENDING",
+    `expected default status SITE_INSPECTION_PENDING, got ${pipelineConnection.status}`,
+  );
+
+  // Mirrors recordSiteInspection's "nudge status forward" convenience.
+  await db.connection.update({
+    where: { id: pipelineConnection.id },
+    data: {
+      siteInspectionDate: new Date(),
+      siteInspectorName: "Test Inspector",
+      status: "SITE_INSPECTION_DONE",
+    },
+  });
+
+  // Mirrors updateSubsidyApplication's status nudges.
+  await db.connection.update({
+    where: { id: pipelineConnection.id },
+    data: {
+      docIdProofVerified: true,
+      docAddressProofVerified: true,
+      docElectricityBillVerified: true,
+      docOwnershipVerified: true,
+      docBankPassbookVerified: true,
+    },
+  });
+  const afterDocs = await db.connection.findFirst({ where: { id: pipelineConnection.id } });
+  const documentsVerified = [
+    afterDocs!.docIdProofVerified,
+    afterDocs!.docAddressProofVerified,
+    afterDocs!.docElectricityBillVerified,
+    afterDocs!.docOwnershipVerified,
+    afterDocs!.docBankPassbookVerified,
+  ].every(Boolean);
+  assert(documentsVerified, "expected all 5 document checkboxes to compute documentsVerified=true");
+
+  await db.connection.update({
+    where: { id: pipelineConnection.id },
+    data: { subsidyStatus: "APPLIED", subsidyAppliedAt: new Date(), status: "SUBSIDY_APPLIED" },
+  });
+  await db.connection.update({
+    where: { id: pipelineConnection.id },
+    data: { subsidyStatus: "APPROVED", subsidyApprovedAt: new Date(), status: "SUBSIDY_APPROVED" },
+  });
+
+  const afterSubsidy = await db.connection.findFirst({ where: { id: pipelineConnection.id } });
+  assert(afterSubsidy!.status === "SUBSIDY_APPROVED", `expected status SUBSIDY_APPROVED, got ${afterSubsidy!.status}`);
+  assert(afterSubsidy!.subsidyStatus === "APPROVED", "expected subsidyStatus APPROVED");
+
+  await db.connection.update({
+    where: { id: pipelineConnection.id },
+    data: { status: "INSTALLATION_IN_PROGRESS" },
+  });
+  await db.connection.update({ where: { id: pipelineConnection.id }, data: { status: "COMPLETED" } });
+
+  const warrantyStart = new Date("2026-01-01");
+  await db.connection.update({
+    where: { id: pipelineConnection.id },
+    data: { warrantyStartDate: warrantyStart, warrantyPeriodMonths: 120 },
+  });
+  const afterWarranty = await db.connection.findFirst({ where: { id: pipelineConnection.id } });
+  const expiry = new Date(afterWarranty!.warrantyStartDate!);
+  expiry.setMonth(expiry.getMonth() + afterWarranty!.warrantyPeriodMonths!);
+  assert(expiry.getFullYear() === 2036 && expiry.getMonth() === 0, `expected warranty expiry Jan 2036, got ${expiry}`);
+  assert(afterWarranty!.status === "COMPLETED", "expected final status COMPLETED");
+
+  console.log(
+    "Post-Won pipeline checks passed (status nudges through inspection/subsidy, document checklist, warranty expiry calc).",
+  );
+
   // Cleanup
   await basePrisma.customerPayment.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.inventoryTransaction.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.connection.deleteMany({ where: { tenantId: tenant.id } });
+  await basePrisma.estimate.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.lead.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.inventoryItem.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.tenant.delete({ where: { id: tenant.id } });

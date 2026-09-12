@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -26,11 +27,15 @@ const SOURCES = ["INSTAGRAM", "FACEBOOK", "WHATSAPP", "REFERRAL", "OTHER"] as co
 async function createLeadAction(formData: FormData) {
   "use server";
   const estimatedValue = formData.get("estimatedValue");
+  const email = String(formData.get("email") || "");
+  const requirementNotes = String(formData.get("requirementNotes") || "");
   await createLead({
     customerName: String(formData.get("customerName")),
     phone: String(formData.get("phone")),
     source: formData.get("source") as (typeof SOURCES)[number],
     estimatedValue: estimatedValue ? Number(estimatedValue) : undefined,
+    email: email || undefined,
+    requirementNotes: requirementNotes || undefined,
   });
 }
 
@@ -56,6 +61,10 @@ export default async function LeadsPage() {
               <Input id="phone" name="phone" required />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="email">Email (optional)</Label>
+              <Input id="email" name="email" type="email" />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="source">Source</Label>
               <Select name="source" defaultValue="OTHER">
                 <SelectTrigger id="source">
@@ -74,6 +83,14 @@ export default async function LeadsPage() {
               <Label htmlFor="estimatedValue">Estimated value (₹)</Label>
               <Input id="estimatedValue" name="estimatedValue" type="number" />
             </div>
+            <div className="space-y-2 sm:col-span-4">
+              <Label htmlFor="requirementNotes">Customer requirements</Label>
+              <Textarea
+                id="requirementNotes"
+                name="requirementNotes"
+                placeholder="What the customer is asking for (roof type, monthly bill, budget, etc.)"
+              />
+            </div>
             <div className="sm:col-span-4">
               <Button type="submit">Add lead</Button>
             </div>
@@ -86,6 +103,7 @@ export default async function LeadsPage() {
           <TableRow>
             <TableHead>Customer</TableHead>
             <TableHead>Phone</TableHead>
+            <TableHead>Email</TableHead>
             <TableHead>Source</TableHead>
             <TableHead>Stage</TableHead>
             <TableHead>Est. value</TableHead>
@@ -100,6 +118,7 @@ export default async function LeadsPage() {
                 </Link>
               </TableCell>
               <TableCell>{lead.phone}</TableCell>
+              <TableCell>{lead.email ?? "—"}</TableCell>
               <TableCell>{lead.source}</TableCell>
               <TableCell>
                 <Badge variant={lead.stage === "WON" ? "default" : lead.stage === "LOST" ? "destructive" : "secondary"}>
@@ -111,7 +130,7 @@ export default async function LeadsPage() {
           ))}
           {leads.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5} className="text-center text-muted-foreground">
+              <TableCell colSpan={6} className="text-center text-muted-foreground">
                 No leads yet.
               </TableCell>
             </TableRow>

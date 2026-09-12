@@ -11,7 +11,7 @@ function randomPassword() {
 }
 
 async function main() {
-  const superAdminEmail = "jaswanth.chodavarapu08@gmail.com";
+  const superAdminEmail = "tulin.ops@gmail.com";
   const superAdminPassword = randomPassword();
 
   await prisma.user.upsert({

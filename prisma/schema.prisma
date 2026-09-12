@@ -25,6 +25,7 @@ model Tenant {
 
   users               User[]
   leads               Lead[]
+  estimates           Estimate[]
   inventoryItems      InventoryItem[]
   inventoryTxns       InventoryTransaction[]
   connections         Connection[]
@@ -74,20 +75,57 @@ enum LeadSource {
 }
 
 model Lead {
-  id             String     @id @default(cuid())
-  tenantId       String
-  tenant         Tenant     @relation(fields: [tenantId], references: [id])
-  customerName   String
-  phone          String
-  source         LeadSource @default(OTHER)
-  stage          LeadStage  @default(NEW)
-  estimatedValue Decimal?   @db.Decimal(12, 2)
-  notes          LeadNote[]
-  connection     Connection?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  id               String     @id @default(cuid())
+  tenantId         String
+  tenant           Tenant     @relation(fields: [tenantId], references: [id])
+  customerName     String
+  phone            String
+  email            String?
+  requirementNotes String?    // free text the Admin fills in manually from the customer conversation
+  source           LeadSource @default(OTHER)
+  stage            LeadStage  @default(NEW)
+  estimatedValue   Decimal?   @db.Decimal(12, 2)
+  notes            LeadNote[]
+  estimates        Estimate[]
+  connection       Connection?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
 
   @@index([tenantId, stage])
+}
+
+// ---------- Estimates ----------
+
+enum EstimateStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model Estimate {
+  id              String         @id @default(cuid())
+  tenantId        String
+  tenant          Tenant         @relation(fields: [tenantId], references: [id])
+  leadId          String
+  lead            Lead           @relation(fields: [leadId], references: [id])
+  estimateNumber  String         @unique // generated once at creation, stable across reprints
+  version         Int            @default(1)
+  isCurrent       Boolean        @default(true)
+  systemSizeKw    Decimal?       @db.Decimal(6, 2)
+  lineItems       Json           // {description, spec?, qty, rate, amount}[] — read/rendered as one document, never queried individually
+  subtotal        Decimal        @db.Decimal(12, 2)
+  gstPercent      Decimal        @default(0) @db.Decimal(5, 2)
+  gstAmount       Decimal        @default(0) @db.Decimal(12, 2)
+  totalAmount     Decimal        @db.Decimal(12, 2)
+  subsidyEstimate Decimal?       @db.Decimal(12, 2)
+  status          EstimateStatus @default(DRAFT)
+  validUntil      DateTime?
+  notes           String?        // terms & conditions shown on the printed estimate
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([tenantId, leadId])
 }
 
 model LeadNote {
@@ -150,10 +188,21 @@ model InventoryTransaction {
 // ---------- Connections (won leads -> installations) ----------
 
 enum ConnectionStatus {
-  PENDING_INSTALL
-  IN_PROGRESS
-  INSTALLED
+  SITE_INSPECTION_PENDING
+  SITE_INSPECTION_DONE
+  SUBSIDY_APPLIED
+  SUBSIDY_APPROVED
+  INSTALLATION_IN_PROGRESS
+  COMPLETED
   CANCELLED
+}
+
+enum SubsidyStatus {
+  NOT_APPLIED
+  APPLIED
+  APPROVED
+  REJECTED
+  DISBURSED
 }
 
 model Connection {
@@ -166,13 +215,42 @@ model Connection {
   phone             String
   address           String?
   systemSizeKw      Decimal?         @db.Decimal(6, 2)
-  status            ConnectionStatus @default(PENDING_INSTALL)
+  status            ConnectionStatus @default(SITE_INSPECTION_PENDING)
   installDate       DateTime?
   assignedInstaller String? // free-text v1; StaffMember link is the Phase 2 upgrade path
   staffMemberId     String?
   staffMember       StaffMember?     @relation(fields: [staffMemberId], references: [id])
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+
+  // Site inspection
+  siteInspectionDate  DateTime?
+  siteInspectorName   String?
+  siteInspectionNotes String?
+
+  // Document verification — fixed checklist for the standard PM Surya Ghar subsidy docs
+  docIdProofVerified         Boolean @default(false)
+  docAddressProofVerified    Boolean @default(false)
+  docElectricityBillVerified Boolean @default(false)
+  docOwnershipVerified       Boolean @default(false)
+  docBankPassbookVerified    Boolean @default(false)
+  documentNotes              String?
+
+  // Government subsidy application
+  subsidyScheme           String?       @default("PM Surya Ghar Muft Bijli Yojana")
+  subsidyApplicationRefNo String?
+  subsidyAppliedAmount    Decimal?      @db.Decimal(12, 2)
+  subsidyApprovedAmount   Decimal?      @db.Decimal(12, 2)
+  subsidyStatus           SubsidyStatus @default(NOT_APPLIED)
+  subsidyAppliedAt        DateTime?
+  subsidyApprovedAt       DateTime?
+  subsidyDisbursedAt      DateTime?
+
+  // Warranty (only meaningful once COMPLETED, but not hard-gated)
+  warrantyStartDate    DateTime?
+  warrantyPeriodMonths Int?
+  warrantyNotes        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   inventoryTxns InventoryTransaction[]
   payments      CustomerPayment[]

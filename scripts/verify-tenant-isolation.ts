@@ -59,12 +59,33 @@ async function main() {
   const bSeesAConnection = await dbB.connection.findFirst({ where: { id: convertedConnection.id } });
   assert(bSeesAConnection === null, "tenant B could read tenant A's connection — ISOLATION BROKEN");
 
+  // 4. Estimate model (added for the estimate/inspection/subsidy pipeline)
+  // must be tenant-scoped too — it's easy to forget to add a new model to
+  // TENANT_SCOPED_MODELS, so this is a direct regression check for that.
+  const estimateA = await dbA.estimate.create({
+    data: {
+      tenantId: tenantA.id,
+      leadId: leadA.id,
+      estimateNumber: `ISO-TEST/${Date.now()}`,
+      lineItems: [{ description: "Panel", qty: 1, rate: 100, amount: 100 }],
+      subtotal: 100,
+      totalAmount: 100,
+    },
+  });
+
+  const bSeesAEstimate = await dbB.estimate.findFirst({ where: { id: estimateA.id } });
+  assert(bSeesAEstimate === null, "tenant B could read tenant A's estimate — ISOLATION BROKEN");
+
+  const estimatesSeenByA = await dbA.estimate.findMany({});
+  assert(estimatesSeenByA.length === 1, `expected A to see 1 estimate, saw ${estimatesSeenByA.length}`);
+
   console.log("All tenant isolation checks passed.");
 
   // Clean up in dependency order so this script is safe to re-run against a
   // shared dev database without leaving orphan test tenants behind.
   for (const tenantId of [tenantA.id, tenantB.id]) {
     await basePrisma.connection.deleteMany({ where: { tenantId } });
+    await basePrisma.estimate.deleteMany({ where: { tenantId } });
     await basePrisma.lead.deleteMany({ where: { tenantId } });
     await basePrisma.tenant.delete({ where: { id: tenantId } });
   }

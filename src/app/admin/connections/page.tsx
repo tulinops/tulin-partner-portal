@@ -41,8 +41,8 @@ export default async function ConnectionsPage() {
                 </TableCell>
                 <TableCell>{c.systemSizeKw ? `${c.systemSizeKw} kW` : "—"}</TableCell>
                 <TableCell>
-                  <Badge variant={c.status === "INSTALLED" ? "default" : c.status === "CANCELLED" ? "destructive" : "secondary"}>
-                    {c.status.replace("_", " ")}
+                  <Badge variant={c.status === "COMPLETED" ? "default" : c.status === "CANCELLED" ? "destructive" : "secondary"}>
+                    {c.status.replace(/_/g, " ")}
                   </Badge>
                 </TableCell>
                 <TableCell>₹{collected.toLocaleString("en-IN")}</TableCell>

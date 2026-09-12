@@ -19,6 +19,7 @@ if (process.env.NODE_ENV !== "production") {
 const TENANT_SCOPED_MODELS = new Set([
   "Lead",
   "LeadNote",
+  "Estimate",
   "InventoryItem",
   "InventoryTransaction",
   "Connection",
