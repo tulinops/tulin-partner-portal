@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import { getEstimate, type EstimateLineItem } from "@/server/leads";
 import { amountInWords } from "@/lib/amountInWords";
+import { brandLabel } from "@/lib/estimateBrands";
+import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
 import { PrintButton } from "@/components/print-button";
 
 function money(n: number) {
@@ -22,21 +24,27 @@ export default async function EstimatePrintPage({
   const totalAmount = Number(estimate.totalAmount);
   const subsidyEstimate = estimate.subsidyEstimate ? Number(estimate.subsidyEstimate) : null;
   const netPayable = subsidyEstimate !== null ? totalAmount - subsidyEstimate : null;
+  const selectedBrandLabel = brandLabel(estimate.brand);
+  const validityDays = estimate.validUntil
+    ? Math.round((estimate.validUntil.getTime() - estimate.createdAt.getTime()) / 86400000)
+    : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-12">
+      <style>{"@page { size: A4 portrait; margin: 7mm; }"}</style>
+
       <div className="print:hidden">
         <PrintButton />
       </div>
 
       <div className="border bg-background p-8 print:border-0 print:p-0">
-        <div className="border-b-4 border-primary pb-4 text-center">
-          <h1 className="text-2xl font-bold uppercase tracking-wide">{estimate.tenant.name}</h1>
+        <div className="border-b-[3px] border-[#16823b] pb-4 text-center">
+          <h1 className="text-2xl font-bold uppercase tracking-wide text-[#08752f]">{estimate.tenant.name}</h1>
           {estimate.tenant.businessAddress && (
             <p className="mt-1 text-sm">{estimate.tenant.businessAddress}</p>
           )}
           <p className="mt-1 text-sm font-medium">
-            {estimate.tenant.gstin && <span className="text-destructive">GST NO: {estimate.tenant.gstin}</span>}
+            {estimate.tenant.gstin && <span className="text-[#b00000]">GST NO: {estimate.tenant.gstin}</span>}
             {estimate.tenant.gstin && (estimate.tenant.contactPhone || estimate.tenant.contactEmail) ? " | " : ""}
             {estimate.tenant.contactPhone && `PHONE: ${estimate.tenant.contactPhone}`}
             {estimate.tenant.contactPhone && estimate.tenant.contactEmail ? " | " : ""}
@@ -49,57 +57,66 @@ export default async function EstimatePrintPage({
         <table className="mt-4 w-full border-collapse text-sm">
           <tbody>
             <tr>
-              <td className="w-1/4 border bg-muted/50 p-2 font-semibold">Customer Name</td>
-              <td className="border p-2">{estimate.lead.customerName}</td>
-              <td className="w-1/4 border bg-muted/50 p-2 font-semibold">Estimate No.</td>
-              <td className="border p-2">{estimate.estimateNumber}</td>
+              <td className="w-1/4 border border-[#aaa] bg-[#f2f7f3] p-2 font-semibold">Customer Name</td>
+              <td className="border border-[#aaa] p-2">{estimate.lead.customerName}</td>
+              <td className="w-1/4 border border-[#aaa] bg-[#f2f7f3] p-2 font-semibold">Quotation No.</td>
+              <td className="border border-[#aaa] p-2">{estimate.estimateNumber}</td>
             </tr>
             <tr>
-              <td className="border bg-muted/50 p-2 font-semibold">Phone / Email</td>
-              <td className="border p-2">
-                {estimate.lead.phone}
-                {estimate.lead.email ? ` · ${estimate.lead.email}` : ""}
-              </td>
-              <td className="border bg-muted/50 p-2 font-semibold">Estimate Date</td>
-              <td className="border p-2">{estimate.createdAt.toLocaleDateString("en-IN")}</td>
-            </tr>
-            <tr>
-              <td className="border bg-muted/50 p-2 font-semibold">Customer Address</td>
-              <td className="border p-2" colSpan={3}>
+              <td className="border border-[#aaa] bg-[#f2f7f3] p-2 font-semibold">Customer Address</td>
+              <td className="border border-[#aaa] p-2" colSpan={3}>
                 {estimate.lead.address || "—"}
               </td>
             </tr>
             <tr>
-              <td className="border bg-muted/50 p-2 font-semibold">System Size</td>
-              <td className="border p-2">{estimate.systemSizeKw ? `${estimate.systemSizeKw} kW` : "—"}</td>
-              <td className="border bg-muted/50 p-2 font-semibold">Valid Until</td>
-              <td className="border p-2">
-                {estimate.validUntil ? estimate.validUntil.toLocaleDateString("en-IN") : "—"}
+              <td className="border border-[#aaa] bg-[#f2f7f3] p-2 font-semibold">Quotation Date</td>
+              <td className="border border-[#aaa] p-2">{estimate.createdAt.toLocaleDateString("en-IN")}</td>
+              <td className="border border-[#aaa] bg-[#f2f7f3] p-2 font-semibold">Validity</td>
+              <td className="border border-[#aaa] p-2">
+                {estimate.validUntil
+                  ? `${estimate.validUntil.toLocaleDateString("en-IN")}${validityDays !== null ? ` (${validityDays} Days)` : ""}`
+                  : "—"}
+              </td>
+            </tr>
+            <tr>
+              <td className="border border-[#aaa] bg-[#f2f7f3] p-2 font-semibold">Phone / Email</td>
+              <td className="border border-[#aaa] p-2" colSpan={3}>
+                {estimate.lead.phone}
+                {estimate.lead.email ? ` · ${estimate.lead.email}` : ""}
               </td>
             </tr>
           </tbody>
         </table>
 
+        <div className="mt-3 space-y-1">
+          <p className="font-bold text-[#08752f]">
+            System Capacity: {estimate.systemSizeKw ? `${estimate.systemSizeKw} kW` : "Not Selected"}
+          </p>
+          <p className="font-bold text-[#08752f]">
+            Selected Brand: {selectedBrandLabel ?? "Not Selected"}
+          </p>
+        </div>
+
         <table className="mt-4 w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-primary text-primary-foreground">
-              <th className="border p-2 text-left">S.No</th>
-              <th className="border p-2 text-left">Description</th>
-              <th className="border p-2 text-left">Specification / Details</th>
-              <th className="border p-2 text-right">Qty</th>
-              <th className="border p-2 text-right">Rate</th>
-              <th className="border p-2 text-right">Amount</th>
+            <tr className="bg-[#16823b] text-white">
+              <th className="border border-[#0c5b29] p-2 text-left">S.No</th>
+              <th className="border border-[#0c5b29] p-2 text-left">Description</th>
+              <th className="border border-[#0c5b29] p-2 text-left">Specification / Details</th>
+              <th className="border border-[#0c5b29] p-2 text-right">Qty</th>
+              <th className="border border-[#0c5b29] p-2 text-right">Rate</th>
+              <th className="border border-[#0c5b29] p-2 text-right">Amount</th>
             </tr>
           </thead>
           <tbody>
             {lineItems.map((item, i) => (
               <tr key={i}>
-                <td className="border p-2">{i + 1}</td>
-                <td className="border p-2">{item.description}</td>
-                <td className="border p-2">{item.spec}</td>
-                <td className="border p-2 text-right">{item.qty}</td>
-                <td className="border p-2 text-right">{money(item.rate)}</td>
-                <td className="border p-2 text-right font-medium">{money(item.amount)}</td>
+                <td className="border border-[#999] p-2">{i + 1}</td>
+                <td className="border border-[#999] p-2">{item.description}</td>
+                <td className="border border-[#999] p-2">{item.spec}</td>
+                <td className="border border-[#999] p-2 text-right">{item.qty}</td>
+                <td className="border border-[#999] p-2 text-right">{money(item.rate)}</td>
+                <td className="border border-[#999] p-2 text-right font-medium">{money(item.amount)}</td>
               </tr>
             ))}
           </tbody>
@@ -109,26 +126,28 @@ export default async function EstimatePrintPage({
           <table className="w-80 border-collapse text-sm">
             <tbody>
               <tr>
-                <td className="border bg-muted/50 p-2 font-semibold">Subtotal</td>
-                <td className="border p-2 text-right">₹ {money(subtotal)}</td>
+                <td className="border border-[#999] bg-[#f2f7f3] p-2 font-semibold">Subtotal</td>
+                <td className="border border-[#999] p-2 text-right">₹ {money(subtotal)}</td>
               </tr>
               <tr>
-                <td className="border bg-muted/50 p-2 font-semibold">GST ({estimate.gstPercent.toString()}%)</td>
-                <td className="border p-2 text-right">₹ {money(gstAmount)}</td>
+                <td className="border border-[#999] bg-[#f2f7f3] p-2 font-semibold">
+                  GST ({estimate.gstPercent.toString()}%)
+                </td>
+                <td className="border border-[#999] p-2 text-right">₹ {money(gstAmount)}</td>
               </tr>
-              <tr className="bg-primary text-primary-foreground">
-                <td className="border p-2 font-semibold">GRAND TOTAL</td>
-                <td className="border p-2 text-right font-semibold">₹ {money(totalAmount)}</td>
+              <tr className="bg-[#16823b] text-white">
+                <td className="border border-[#0c5b29] p-2 font-semibold">GRAND TOTAL</td>
+                <td className="border border-[#0c5b29] p-2 text-right font-semibold">₹ {money(totalAmount)}</td>
               </tr>
               {subsidyEstimate !== null && (
                 <>
                   <tr>
-                    <td className="border bg-muted/50 p-2 font-semibold">Est. Government Subsidy</td>
-                    <td className="border p-2 text-right">− ₹ {money(subsidyEstimate)}</td>
+                    <td className="border border-[#999] bg-[#f2f7f3] p-2 font-semibold">Est. Government Subsidy</td>
+                    <td className="border border-[#999] p-2 text-right">− ₹ {money(subsidyEstimate)}</td>
                   </tr>
                   <tr>
-                    <td className="border bg-muted/50 p-2 font-semibold">Net Payable (after subsidy)</td>
-                    <td className="border p-2 text-right font-semibold">₹ {money(netPayable!)}</td>
+                    <td className="border border-[#999] bg-[#f2f7f3] p-2 font-semibold">Net Payable (after subsidy)</td>
+                    <td className="border border-[#999] p-2 text-right font-semibold">₹ {money(netPayable!)}</td>
                   </tr>
                 </>
               )}
@@ -136,23 +155,15 @@ export default async function EstimatePrintPage({
           </table>
         </div>
 
-        <div className="mt-4 border p-2 text-sm">
+        <div className="mt-4 border border-[#ccc] p-2 text-sm">
           <strong>Amount in Words: </strong>
           {amountInWords(totalAmount)}
         </div>
 
-        <div className="mt-8 border-t-2 pt-3">
-          <h3 className="font-semibold">Terms &amp; Conditions</h3>
+        <div className="mt-8 border-t-2 border-[#16823b] pt-3">
+          <h3 className="font-semibold text-[#08752f]">Terms &amp; Conditions</h3>
           <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-            {estimate.notes ||
-              `1. Prices are subject to the specifications mentioned in this estimate.
-2. Material quantity may vary as per site conditions.
-3. Installation and commissioning shall be carried out as agreed with the customer.
-4. Payment terms shall be mutually agreed between the customer and ${estimate.tenant.name}.
-5. Estimate validity: as stated above from the date of issue.
-6. Warranty will be as per the respective manufacturer's / installer's standard warranty terms.
-7. Any additional work or material not mentioned in this estimate will be charged separately.
-8. Final government subsidy amount is subject to scheme eligibility and approval; the figure above is indicative only.`}
+            {estimate.notes || DEFAULT_ESTIMATE_TERMS}
           </p>
         </div>
 

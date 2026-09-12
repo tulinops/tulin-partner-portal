@@ -24,22 +24,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { EstimateItemsBuilder } from "./estimate-items-builder";
+import { SOLAR_BRANDS, type SolarBrandValue } from "@/lib/estimateBrands";
+import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
 
 const STAGES = ["NEW", "CONTACTED", "SITE_VISIT", "QUOTED", "WON", "LOST"] as const;
+const LINE_ITEM_ROW_COUNT = 8;
 
-// Default line-item categories, mirroring tulin-solar's quotation.html brand
-// template — the Admin fills in specification/qty/rate, blank rows are
-// dropped server-side.
-const LINE_ITEM_DEFAULTS = [
-  { description: "Solar PV Module", spec: "" },
-  { description: "Solar Inverter", spec: "" },
-  { description: "Solar Mounting Structure", spec: "Hot Dip Galvanized / Aluminium Structure" },
-  { description: "DC Solar Cable", spec: "UV Resistant DC Solar Cable" },
-  { description: "AC Cable", spec: "Copper / Aluminium AC Cable" },
-  { description: "MC4 Connectors", spec: "Original Compatible MC4 Connectors" },
-  { description: "Earthing & Lightning Protection", spec: "Complete Earthing & Lightning Protection System" },
-  { description: "Installation & Commissioning", spec: "Complete Solar System Installation & Commissioning" },
-];
+function defaultValidUntil() {
+  return new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
 
 export default async function LeadDetailPage({
   params,
@@ -90,7 +84,7 @@ export default async function LeadDetailPage({
   async function createEstimateAction(formData: FormData) {
     "use server";
     const lineItems: EstimateLineItem[] = [];
-    for (let i = 0; i < LINE_ITEM_DEFAULTS.length; i++) {
+    for (let i = 0; i < LINE_ITEM_ROW_COUNT; i++) {
       const description = String(formData.get(`item_${i}_description`) || "");
       if (!description.trim()) continue;
       lineItems.push({
@@ -106,10 +100,15 @@ export default async function LeadDetailPage({
     const gstPercent = formData.get("gstPercent");
     const subsidyEstimate = formData.get("subsidyEstimate");
     const validUntil = formData.get("validUntil");
+    // FormData is untrusted input — validate against the known brand list
+    // before it reaches a typed Prisma enum column.
+    const rawBrand = String(formData.get("brand") || "");
+    const brand = SOLAR_BRANDS.some((b) => b.value === rawBrand) ? (rawBrand as SolarBrandValue) : undefined;
 
     await createEstimate({
       leadId: id,
       systemSizeKw: systemSizeKw ? Number(systemSizeKw) : undefined,
+      brand,
       lineItems,
       gstPercent: gstPercent ? Number(gstPercent) : undefined,
       subsidyEstimate: subsidyEstimate ? Number(subsidyEstimate) : undefined,
@@ -231,11 +230,10 @@ export default async function LeadDetailPage({
 
           <form action={createEstimateAction} className="space-y-4">
             <h3 className="text-sm font-semibold">Create new estimate</h3>
-            <div className="grid gap-4 sm:grid-cols-4">
-              <div className="space-y-2">
-                <Label htmlFor="systemSizeKw">System size (kW)</Label>
-                <Input id="systemSizeKw" name="systemSizeKw" type="number" step="0.1" />
-              </div>
+
+            <EstimateItemsBuilder />
+
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
                 <Label htmlFor="gstPercent">GST (%)</Label>
                 <Input id="gstPercent" name="gstPercent" type="number" step="0.01" defaultValue="5" />
@@ -246,47 +244,13 @@ export default async function LeadDetailPage({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="validUntil">Valid until</Label>
-                <Input id="validUntil" name="validUntil" type="date" />
+                <Input id="validUntil" name="validUntil" type="date" defaultValue={defaultValidUntil()} />
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-sm">
-                <thead>
-                  <tr>
-                    <th className="border p-1 text-left">Description</th>
-                    <th className="border p-1 text-left">Specification</th>
-                    <th className="border p-1 text-left">Qty</th>
-                    <th className="border p-1 text-left">Rate (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {LINE_ITEM_DEFAULTS.map((row, i) => (
-                    <tr key={i}>
-                      <td className="border p-1">
-                        <Input name={`item_${i}_description`} defaultValue={row.description} />
-                      </td>
-                      <td className="border p-1">
-                        <Input name={`item_${i}_spec`} defaultValue={row.spec} />
-                      </td>
-                      <td className="border p-1">
-                        <Input name={`item_${i}_qty`} type="number" step="0.01" className="w-20" />
-                      </td>
-                      <td className="border p-1">
-                        <Input name={`item_${i}_rate`} type="number" step="0.01" className="w-28" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Clear a description to leave that row out of the estimate.
-              </p>
-            </div>
-
             <div className="space-y-2">
-              <Label htmlFor="notes">Terms &amp; conditions (optional — defaults to standard terms)</Label>
-              <Textarea id="notes" name="notes" />
+              <Label htmlFor="notes">Terms &amp; conditions</Label>
+              <Textarea id="notes" name="notes" defaultValue={DEFAULT_ESTIMATE_TERMS} rows={8} />
             </div>
 
             <Button type="submit">Create estimate</Button>

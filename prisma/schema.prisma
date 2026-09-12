@@ -110,6 +110,15 @@ enum EstimateStatus {
   REJECTED
 }
 
+enum SolarBrand {
+  WAAREE
+  LUMINOUS
+  MICROTEK
+  RENEW
+  VIKRAM
+  ADANI
+}
+
 model Estimate {
   id              String         @id @default(cuid())
   tenantId        String
@@ -120,6 +129,7 @@ model Estimate {
   version         Int            @default(1)
   isCurrent       Boolean        @default(true)
   systemSizeKw    Decimal?       @db.Decimal(6, 2)
+  brand           SolarBrand?
   lineItems       Json           // {description, spec?, qty, rate, amount}[] — read/rendered as one document, never queried individually
   subtotal        Decimal        @db.Decimal(12, 2)
   gstPercent      Decimal        @default(0) @db.Decimal(5, 2)

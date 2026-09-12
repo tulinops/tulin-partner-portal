@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
-import type { LeadSource, LeadStage, EstimateStatus } from "@/generated/prisma/enums";
+import type { LeadSource, LeadStage, EstimateStatus, SolarBrand } from "@/generated/prisma/enums";
 
 export async function listLeads() {
   const { db } = await getTenantDb();
@@ -123,6 +123,7 @@ async function generateEstimateNumber(tenantSlug: string) {
 export async function createEstimate(input: {
   leadId: string;
   systemSizeKw?: number;
+  brand?: SolarBrand;
   lineItems: EstimateLineItem[];
   gstPercent?: number;
   subsidyEstimate?: number;
@@ -161,6 +162,7 @@ export async function createEstimate(input: {
         version: prior + 1,
         isCurrent: true,
         systemSizeKw: input.systemSizeKw,
+        brand: input.brand,
         lineItems: items,
         subtotal,
         gstPercent,
