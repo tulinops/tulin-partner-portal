@@ -10,10 +10,12 @@ import type {
   SubsidyStatus,
   SiteVisitStatus,
   SiteVisitResult,
-  RoofType,
-  RoofCondition,
-  RoofAccess,
   SitePhotoCategory,
+  FinancingMethod,
+  LoanStatus,
+  InstallationStatus,
+  EquipmentType,
+  WarrantyType,
 } from "@/generated/prisma/enums";
 
 export async function listConnections() {
@@ -34,6 +36,12 @@ export async function getConnectionDetail(connectionId: string) {
       inventoryTxns: { include: { inventoryItem: true }, orderBy: { createdAt: "desc" } },
       staffMember: true,
       sitePhotos: { orderBy: { uploadedAt: "desc" } },
+      connectionDocuments: {
+        include: { requiredDocumentType: true },
+        orderBy: { requiredDocumentType: { displayOrder: "asc" } },
+      },
+      loanApplications: { orderBy: { createdAt: "desc" } },
+      warrantyRecords: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!connection) return null;
@@ -44,20 +52,35 @@ export async function getConnectionDetail(connectionId: string) {
     .reduce((sum, t) => sum + Number(t.quantity) * Number(t.unitCost ?? 0), 0);
   const profit = amountCollected - allocatedCost;
 
-  const documentsVerified = [
-    connection.docIdProofVerified,
-    connection.docAddressProofVerified,
-    connection.docElectricityBillVerified,
-    connection.docOwnershipVerified,
-    connection.docBankPassbookVerified,
-  ].every(Boolean);
+  const documentsVerified =
+    connection.connectionDocuments.length > 0 &&
+    connection.connectionDocuments.every((d) => d.status === "VERIFIED");
 
-  const warrantyExpiryDate =
-    connection.warrantyStartDate && connection.warrantyPeriodMonths
-      ? addMonths(connection.warrantyStartDate, connection.warrantyPeriodMonths)
-      : null;
+  const currentLoanApplication = connection.loanApplications.find((l) => l.isCurrent) ?? null;
+  const loanPendingAmount = currentLoanApplication
+    ? Number(currentLoanApplication.loanAmount) - Number(currentLoanApplication.paymentReceivedByProprietorAmount ?? 0)
+    : null;
 
-  return { connection, amountCollected, allocatedCost, profit, documentsVerified, warrantyExpiryDate };
+  const warrantyRecordsWithExpiry = connection.warrantyRecords.map((w) => ({
+    ...w,
+    expiryDate: addMonths(w.startDate, w.periodMonths),
+  }));
+
+  const siteInspectionDetails = (connection.siteInspectionDetails ?? null) as SiteInspectionDetails | null;
+  const installedEquipment = (connection.installedEquipment ?? []) as InstalledEquipmentItem[];
+
+  return {
+    connection,
+    amountCollected,
+    allocatedCost,
+    profit,
+    documentsVerified,
+    currentLoanApplication,
+    loanPendingAmount,
+    warrantyRecordsWithExpiry,
+    siteInspectionDetails,
+    installedEquipment,
+  };
 }
 
 function addMonths(date: Date, months: number) {
@@ -65,6 +88,32 @@ function addMonths(date: Date, months: number) {
   result.setMonth(result.getMonth() + months);
   return result;
 }
+
+// Property-inspection fields as one JSON blob rather than individually typed
+// columns — the kind of business-specific data shape likely to differ per
+// solar proprietor. See prisma/schema.prisma's Connection.siteInspectionDetails.
+export type SiteInspectionDetails = {
+  roofType?: string;
+  roofCondition?: string;
+  roofAreaSqft?: number;
+  shadowObstruction?: string;
+  orientation?: string;
+  roofAccess?: string;
+  electricalConnectionDetails?: string;
+  meterInformation?: string;
+  otherRequirements?: string;
+};
+
+// Same pattern as EstimateLineItem — always read/edited together per
+// connection, never queried individually across connections.
+export type InstalledEquipmentItem = {
+  type: EquipmentType;
+  brand?: string;
+  model?: string;
+  serialNumber?: string;
+  quantity: number;
+  notes?: string;
+};
 
 export async function recordPayment(input: {
   connectionId: string;
@@ -149,17 +198,9 @@ export async function updateSiteVisitStatus(input: { connectionId: string; statu
   revalidatePath(`/admin/connections/${input.connectionId}`);
 }
 
-export async function recordPropertyInspection(input: {
+export async function recordSiteInspectionDetails(input: {
   connectionId: string;
-  roofType?: RoofType;
-  roofCondition?: RoofCondition;
-  roofAreaSqft?: number;
-  shadowObstruction?: string;
-  orientation?: string;
-  roofAccess?: RoofAccess;
-  electricalConnectionDetails?: string;
-  meterInformation?: string;
-  otherSiteRequirements?: string;
+  details: SiteInspectionDetails;
 }) {
   const { db } = await getTenantDb();
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
@@ -167,17 +208,7 @@ export async function recordPropertyInspection(input: {
 
   await db.connection.update({
     where: { id: input.connectionId },
-    data: {
-      roofType: input.roofType,
-      roofCondition: input.roofCondition,
-      roofAreaSqft: input.roofAreaSqft,
-      shadowObstruction: input.shadowObstruction,
-      orientation: input.orientation,
-      roofAccess: input.roofAccess,
-      electricalConnectionDetails: input.electricalConnectionDetails,
-      meterInformation: input.meterInformation,
-      otherSiteRequirements: input.otherSiteRequirements,
-    },
+    data: { siteInspectionDetails: input.details },
   });
   revalidatePath(`/admin/connections/${input.connectionId}`);
 }
@@ -242,29 +273,14 @@ export async function uploadSitePhoto(formData: FormData) {
   revalidatePath(`/admin/connections/${connectionId}`);
 }
 
-export async function updateDocumentVerification(input: {
-  connectionId: string;
-  docIdProofVerified: boolean;
-  docAddressProofVerified: boolean;
-  docElectricityBillVerified: boolean;
-  docOwnershipVerified: boolean;
-  docBankPassbookVerified: boolean;
-  documentNotes?: string;
-}) {
+export async function selectFinancingMethod(input: { connectionId: string; method: FinancingMethod }) {
   const { db } = await getTenantDb();
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
 
   await db.connection.update({
     where: { id: input.connectionId },
-    data: {
-      docIdProofVerified: input.docIdProofVerified,
-      docAddressProofVerified: input.docAddressProofVerified,
-      docElectricityBillVerified: input.docElectricityBillVerified,
-      docOwnershipVerified: input.docOwnershipVerified,
-      docBankPassbookVerified: input.docBankPassbookVerified,
-      documentNotes: input.documentNotes,
-    },
+    data: { financingMethod: input.method },
   });
   revalidatePath(`/admin/connections/${input.connectionId}`);
 }
@@ -309,22 +325,185 @@ export async function updateSubsidyApplication(input: {
   revalidatePath(`/admin/connections/${input.connectionId}`);
 }
 
-export async function updateWarranty(input: {
+// ---------- Loan applications ----------
+
+export async function createLoanApplication(input: {
   connectionId: string;
-  warrantyStartDate: Date;
-  warrantyPeriodMonths: number;
-  warrantyNotes?: string;
+  bankName: string;
+  applicationNumber?: string;
+  loanAmount: number;
+  applicationDate?: Date;
 }) {
+  const { db, tenantId } = await getTenantDb();
+  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
+  if (!connection) throw new Error("Connection not found");
+
+  // Supersede any prior application for this connection, same
+  // supersede-and-mark-current pattern as Estimate.version/isCurrent.
+  await db.$transaction(async (tx) => {
+    await tx.loanApplication.updateMany({
+      where: { connectionId: input.connectionId },
+      data: { isCurrent: false },
+    });
+    await tx.loanApplication.create({
+      data: {
+        tenantId,
+        connectionId: input.connectionId,
+        bankName: input.bankName,
+        applicationNumber: input.applicationNumber,
+        loanAmount: input.loanAmount,
+        applicationDate: input.applicationDate,
+      },
+    });
+  });
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+export async function updateLoanApplication(input: {
+  id: string;
+  status: LoanStatus;
+  sanctionedAt?: Date;
+  sanctionedAmount?: number;
+  disbursedAmount?: number;
+  disbursedAt?: Date;
+  paymentReceivedByProprietorAmount?: number;
+  paymentReceivedByProprietorAt?: Date;
+  paymentReference?: string;
+  notes?: string;
+}) {
+  const { db } = await getTenantDb();
+  const loan = await db.loanApplication.findFirst({ where: { id: input.id } });
+  if (!loan) throw new Error("Loan application not found");
+
+  await db.loanApplication.update({
+    where: { id: input.id },
+    data: {
+      status: input.status,
+      sanctionedAt: input.sanctionedAt,
+      sanctionedAmount: input.sanctionedAmount,
+      disbursedAmount: input.disbursedAmount,
+      disbursedAt: input.disbursedAt,
+      paymentReceivedByProprietorAmount: input.paymentReceivedByProprietorAmount,
+      paymentReceivedByProprietorAt: input.paymentReceivedByProprietorAt,
+      paymentReference: input.paymentReference,
+      notes: input.notes,
+    },
+  });
+  revalidatePath(`/admin/connections/${loan.connectionId}`);
+}
+
+// ---------- Installation ----------
+
+export async function updateInstallationStatus(input: { connectionId: string; status: InstallationStatus }) {
+  const { db } = await getTenantDb();
+  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
+  if (!connection) throw new Error("Connection not found");
+
+  // Convenience nudge only — the Admin can still override via the overall status card.
+  let nextConnectionStatus = connection.status;
+  if (input.status === "IN_PROGRESS" && connection.status === "SUBSIDY_APPROVED") {
+    nextConnectionStatus = "INSTALLATION_IN_PROGRESS";
+  } else if (input.status === "COMPLETED" && connection.status === "INSTALLATION_IN_PROGRESS") {
+    nextConnectionStatus = "COMPLETED";
+  }
+
+  await db.connection.update({
+    where: { id: input.connectionId },
+    data: { installationStatus: input.status, status: nextConnectionStatus },
+  });
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+export async function updateInstalledEquipment(input: { connectionId: string; items: InstalledEquipmentItem[] }) {
   const { db } = await getTenantDb();
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
 
   await db.connection.update({
     where: { id: input.connectionId },
+    data: { installedEquipment: input.items },
+  });
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+export async function recordInstallationSignOff(input: { connectionId: string; signedOffByName: string; notes?: string }) {
+  const { db, tenantId } = await getTenantDb();
+  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
+  if (!connection) throw new Error("Connection not found");
+
+  await db.connection.update({
+    where: { id: input.connectionId },
     data: {
-      warrantyStartDate: input.warrantyStartDate,
-      warrantyPeriodMonths: input.warrantyPeriodMonths,
-      warrantyNotes: input.warrantyNotes,
+      installationSignedOffAt: new Date(),
+      installationSignedOffByName: input.signedOffByName,
+      installationNotes: input.notes,
+      installationStatus: "COMPLETED",
+      status: connection.status === "INSTALLATION_IN_PROGRESS" ? "COMPLETED" : connection.status,
+    },
+  });
+
+  // Auto-create sensible default warranty records from the installed
+  // equipment, per product type — a convenience, not a hard requirement;
+  // fully editable afterward. Skips types that already have a record.
+  const equipment = (connection.installedEquipment ?? []) as InstalledEquipmentItem[];
+  const existing = await db.warrantyRecord.findMany({ where: { connectionId: input.connectionId } });
+  const existingTypes = new Set(existing.map((w) => w.equipmentType));
+  const defaults: { type: EquipmentType; months: number }[] = [
+    { type: "PANEL", months: 300 },
+    { type: "INVERTER", months: 96 },
+  ];
+  for (const { type, months } of defaults) {
+    const item = equipment.find((e) => e.type === type);
+    if (!item || existingTypes.has(type)) continue;
+    await db.warrantyRecord.create({
+      data: {
+        tenantId,
+        connectionId: input.connectionId,
+        equipmentType: type,
+        productName: type === "PANEL" ? "Solar Panels" : "Inverter",
+        manufacturer: item.brand,
+        model: item.model,
+        serialNumber: type === "INVERTER" ? item.serialNumber : undefined,
+        startDate: new Date(),
+        periodMonths: months,
+      },
+    });
+  }
+
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+// ---------- Warranty ----------
+
+export async function createWarrantyRecord(input: {
+  connectionId: string;
+  equipmentType: EquipmentType;
+  productName: string;
+  manufacturer?: string;
+  model?: string;
+  serialNumber?: string;
+  warrantyType?: WarrantyType;
+  startDate: Date;
+  periodMonths: number;
+  terms?: string;
+}) {
+  const { db, tenantId } = await getTenantDb();
+  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
+  if (!connection) throw new Error("Connection not found");
+
+  await db.warrantyRecord.create({
+    data: {
+      tenantId,
+      connectionId: input.connectionId,
+      equipmentType: input.equipmentType,
+      productName: input.productName,
+      manufacturer: input.manufacturer,
+      model: input.model,
+      serialNumber: input.serialNumber,
+      warrantyType: input.warrantyType,
+      startDate: input.startDate,
+      periodMonths: input.periodMonths,
+      terms: input.terms,
     },
   });
   revalidatePath(`/admin/connections/${input.connectionId}`);

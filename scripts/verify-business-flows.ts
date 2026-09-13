@@ -189,26 +189,17 @@ async function main() {
     },
   });
 
-  // Mirrors updateSubsidyApplication's status nudges.
-  await db.connection.update({
-    where: { id: pipelineConnection.id },
-    data: {
-      docIdProofVerified: true,
-      docAddressProofVerified: true,
-      docElectricityBillVerified: true,
-      docOwnershipVerified: true,
-      docBankPassbookVerified: true,
-    },
+  // Mirrors ensureConnectionDocuments + updateDocumentStatus's configurable checklist.
+  const requiredDocType = await basePrisma.requiredDocumentType.create({
+    data: { tenantId: tenant.id, name: "ID proof", displayOrder: 0 },
   });
-  const afterDocs = await db.connection.findFirst({ where: { id: pipelineConnection.id } });
-  const documentsVerified = [
-    afterDocs!.docIdProofVerified,
-    afterDocs!.docAddressProofVerified,
-    afterDocs!.docElectricityBillVerified,
-    afterDocs!.docOwnershipVerified,
-    afterDocs!.docBankPassbookVerified,
-  ].every(Boolean);
-  assert(documentsVerified, "expected all 5 document checkboxes to compute documentsVerified=true");
+  const connectionDoc = await basePrisma.connectionDocument.create({
+    data: { tenantId: tenant.id, connectionId: pipelineConnection.id, requiredDocumentTypeId: requiredDocType.id },
+  });
+  await db.connectionDocument.update({ where: { id: connectionDoc.id }, data: { status: "VERIFIED" } });
+  const allDocs = await db.connectionDocument.findMany({ where: { connectionId: pipelineConnection.id } });
+  const documentsVerified = allDocs.length > 0 && allDocs.every((d) => d.status === "VERIFIED");
+  assert(documentsVerified, "expected all required documents VERIFIED to compute documentsVerified=true");
 
   await db.connection.update({
     where: { id: pipelineConnection.id },
@@ -230,14 +221,20 @@ async function main() {
   await db.connection.update({ where: { id: pipelineConnection.id }, data: { status: "COMPLETED" } });
 
   const warrantyStart = new Date("2026-01-01");
-  await db.connection.update({
-    where: { id: pipelineConnection.id },
-    data: { warrantyStartDate: warrantyStart, warrantyPeriodMonths: 120 },
+  const warranty = await db.warrantyRecord.create({
+    data: {
+      tenantId: tenant.id,
+      connectionId: pipelineConnection.id,
+      equipmentType: "PANEL",
+      productName: "Solar Panels",
+      startDate: warrantyStart,
+      periodMonths: 120,
+    },
   });
-  const afterWarranty = await db.connection.findFirst({ where: { id: pipelineConnection.id } });
-  const expiry = new Date(afterWarranty!.warrantyStartDate!);
-  expiry.setMonth(expiry.getMonth() + afterWarranty!.warrantyPeriodMonths!);
+  const expiry = new Date(warranty.startDate);
+  expiry.setMonth(expiry.getMonth() + warranty.periodMonths);
   assert(expiry.getFullYear() === 2036 && expiry.getMonth() === 0, `expected warranty expiry Jan 2036, got ${expiry}`);
+  const afterWarranty = await db.connection.findFirst({ where: { id: pipelineConnection.id } });
   assert(afterWarranty!.status === "COMPLETED", "expected final status COMPLETED");
 
   console.log(
@@ -247,6 +244,10 @@ async function main() {
   // Cleanup
   await basePrisma.customerPayment.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.inventoryTransaction.deleteMany({ where: { tenantId: tenant.id } });
+  await basePrisma.warrantyRecord.deleteMany({ where: { tenantId: tenant.id } });
+  await basePrisma.connectionDocument.deleteMany({ where: { tenantId: tenant.id } });
+  await basePrisma.requiredDocumentType.deleteMany({ where: { tenantId: tenant.id } });
+  await basePrisma.loanApplication.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.connection.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.estimate.deleteMany({ where: { tenantId: tenant.id } });
   await basePrisma.lead.deleteMany({ where: { tenantId: tenant.id } });

@@ -93,12 +93,50 @@ async function main() {
   const bSeesAPhoto = await dbB.sitePhoto.findFirst({ where: { id: photoA.id } });
   assert(bSeesAPhoto === null, "tenant B could read tenant A's site photo — ISOLATION BROKEN");
 
+  // 6. RequiredDocumentType, ConnectionDocument, LoanApplication, and
+  // WarrantyRecord (added for the Documents/Subsidy-Loan/Installation/
+  // Warranty stages) must all be tenant-scoped too — same regression risk.
+  const docTypeA = await dbA.requiredDocumentType.create({
+    data: { tenantId: tenantA.id, name: "ID proof" },
+  });
+  const bSeesADocType = await dbB.requiredDocumentType.findFirst({ where: { id: docTypeA.id } });
+  assert(bSeesADocType === null, "tenant B could read tenant A's required document type — ISOLATION BROKEN");
+
+  const connectionDocA = await dbA.connectionDocument.create({
+    data: { tenantId: tenantA.id, connectionId: convertedConnection.id, requiredDocumentTypeId: docTypeA.id },
+  });
+  const bSeesAConnectionDoc = await dbB.connectionDocument.findFirst({ where: { id: connectionDocA.id } });
+  assert(bSeesAConnectionDoc === null, "tenant B could read tenant A's connection document — ISOLATION BROKEN");
+
+  const loanA = await dbA.loanApplication.create({
+    data: { tenantId: tenantA.id, connectionId: convertedConnection.id, bankName: "Test Bank", loanAmount: 100 },
+  });
+  const bSeesALoan = await dbB.loanApplication.findFirst({ where: { id: loanA.id } });
+  assert(bSeesALoan === null, "tenant B could read tenant A's loan application — ISOLATION BROKEN");
+
+  const warrantyA = await dbA.warrantyRecord.create({
+    data: {
+      tenantId: tenantA.id,
+      connectionId: convertedConnection.id,
+      equipmentType: "PANEL",
+      productName: "Test Panel",
+      startDate: new Date(),
+      periodMonths: 12,
+    },
+  });
+  const bSeesAWarranty = await dbB.warrantyRecord.findFirst({ where: { id: warrantyA.id } });
+  assert(bSeesAWarranty === null, "tenant B could read tenant A's warranty record — ISOLATION BROKEN");
+
   console.log("All tenant isolation checks passed.");
 
   // Clean up in dependency order so this script is safe to re-run against a
   // shared dev database without leaving orphan test tenants behind.
   for (const tenantId of [tenantA.id, tenantB.id]) {
     await basePrisma.sitePhoto.deleteMany({ where: { tenantId } });
+    await basePrisma.warrantyRecord.deleteMany({ where: { tenantId } });
+    await basePrisma.connectionDocument.deleteMany({ where: { tenantId } });
+    await basePrisma.requiredDocumentType.deleteMany({ where: { tenantId } });
+    await basePrisma.loanApplication.deleteMany({ where: { tenantId } });
     await basePrisma.connection.deleteMany({ where: { tenantId } });
     await basePrisma.estimate.deleteMany({ where: { tenantId } });
     await basePrisma.lead.deleteMany({ where: { tenantId } });

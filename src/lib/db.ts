@@ -26,6 +26,10 @@ const TENANT_SCOPED_MODELS = new Set([
   "CustomerPayment",
   "StaffMember",
   "SitePhoto",
+  "RequiredDocumentType",
+  "ConnectionDocument",
+  "LoanApplication",
+  "WarrantyRecord",
 ]);
 
 const READ_OPS = new Set([

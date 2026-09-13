@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getBusinessProfile, updateBusinessProfile } from "@/server/business-profile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,22 @@ export default async function BusinessProfilePage() {
               Save
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Required documents</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-sm text-muted-foreground">
+            The checklist every customer&apos;s connection is verified against — configurable per business.
+          </p>
+          <Link href="/admin/settings/documents">
+            <Button variant="outline" size="sm">
+              Manage document types →
+            </Button>
+          </Link>
         </CardContent>
       </Card>
     </div>

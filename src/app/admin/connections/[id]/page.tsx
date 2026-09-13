@@ -6,27 +6,39 @@ import {
   updateConnectionStatus,
   assignSiteVisit,
   updateSiteVisitStatus,
-  recordPropertyInspection,
+  recordSiteInspectionDetails,
   recordSiteVisitResult,
-  updateDocumentVerification,
+  selectFinancingMethod,
   updateSubsidyApplication,
-  updateWarranty,
+  createLoanApplication,
+  updateLoanApplication,
+  updateInstallationStatus,
+  updateInstalledEquipment,
+  recordInstallationSignOff,
+  createWarrantyRecord,
+  type SiteInspectionDetails,
+  type InstalledEquipmentItem,
 } from "@/server/connections";
+import {
+  ensureConnectionDocuments,
+  updateDocumentStatus,
+} from "@/server/documents";
 import { listInventoryItems, allocateToConnection } from "@/server/inventory";
 import { listStaffMembers } from "@/server/staff";
 import { SitePhotos } from "./site-photos";
 import type {
   SiteVisitStatus,
   SiteVisitResult,
-  RoofType,
-  RoofCondition,
-  RoofAccess,
+  FinancingMethod,
+  LoanStatus,
+  InstallationStatus,
+  EquipmentType,
+  DocumentStatus,
 } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -78,6 +90,45 @@ const ROOF_TYPES = ["RCC", "TIN", "TILED", "OTHER"] as const;
 const ROOF_CONDITIONS = ["GOOD", "NEEDS_REPAIR", "POOR"] as const;
 const ROOF_ACCESS_OPTIONS = ["EASY", "LADDER_REQUIRED", "DIFFICULT"] as const;
 
+const DOCUMENT_STATUSES = [
+  "NOT_UPLOADED",
+  "UPLOADED",
+  "UNDER_REVIEW",
+  "VERIFIED",
+  "REJECTED",
+  "REUPLOAD_REQUIRED",
+] as const;
+
+const LOAN_STATUSES = [
+  "APPLICATION_PENDING",
+  "UNDER_REVIEW",
+  "APPROVED",
+  "REJECTED",
+  "DISBURSED",
+  "COMPLETED",
+] as const;
+
+const INSTALLATION_STATUSES = [
+  "PENDING",
+  "SCHEDULED",
+  "TEAM_ASSIGNED",
+  "IN_PROGRESS",
+  "INSPECTION_PENDING",
+  "COMPLETED",
+] as const;
+
+const EQUIPMENT_TYPES = [
+  "PANEL",
+  "INVERTER",
+  "MOUNTING_STRUCTURE",
+  "DC_CABLE",
+  "AC_CABLE",
+  "EARTHING_KIT",
+  "LIGHTNING_ARRESTOR",
+  "NET_METER",
+  "OTHER",
+] as const;
+
 function datetimeLocalValue(d: Date | null | undefined) {
   return d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
 }
@@ -96,11 +147,24 @@ export default async function ConnectionDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  await ensureConnectionDocuments(id);
   const detail = await getConnectionDetail(id);
   if (!detail) notFound();
-  const { connection, amountCollected, allocatedCost, profit, documentsVerified, warrantyExpiryDate } = detail;
+  const {
+    connection,
+    amountCollected,
+    allocatedCost,
+    profit,
+    documentsVerified,
+    currentLoanApplication,
+    loanPendingAmount,
+    warrantyRecordsWithExpiry,
+    siteInspectionDetails,
+    installedEquipment,
+  } = detail;
   const items = await listInventoryItems();
   const staff = await listStaffMembers();
+  const inspection = siteInspectionDetails ?? ({} as SiteInspectionDetails);
 
   async function allocateAction(formData: FormData) {
     "use server";
@@ -146,22 +210,19 @@ export default async function ConnectionDetailPage({
 
   async function propertyInspectionAction(formData: FormData) {
     "use server";
-    const roofType = String(formData.get("roofType") || "");
-    const roofCondition = String(formData.get("roofCondition") || "");
-    const roofAccess = String(formData.get("roofAccess") || "");
     const roofAreaSqft = formData.get("roofAreaSqft");
-    await recordPropertyInspection({
-      connectionId: id,
-      roofType: roofType ? (roofType as RoofType) : undefined,
-      roofCondition: roofCondition ? (roofCondition as RoofCondition) : undefined,
+    const details: SiteInspectionDetails = {
+      roofType: String(formData.get("roofType") || "") || undefined,
+      roofCondition: String(formData.get("roofCondition") || "") || undefined,
       roofAreaSqft: roofAreaSqft ? Number(roofAreaSqft) : undefined,
       shadowObstruction: String(formData.get("shadowObstruction") || "") || undefined,
       orientation: String(formData.get("orientation") || "") || undefined,
-      roofAccess: roofAccess ? (roofAccess as RoofAccess) : undefined,
+      roofAccess: String(formData.get("roofAccess") || "") || undefined,
       electricalConnectionDetails: String(formData.get("electricalConnectionDetails") || "") || undefined,
       meterInformation: String(formData.get("meterInformation") || "") || undefined,
-      otherSiteRequirements: String(formData.get("otherSiteRequirements") || "") || undefined,
-    });
+      otherRequirements: String(formData.get("otherRequirements") || "") || undefined,
+    };
+    await recordSiteInspectionDetails({ connectionId: id, details });
   }
 
   async function siteVisitResultAction(formData: FormData) {
@@ -173,16 +234,12 @@ export default async function ConnectionDetailPage({
     });
   }
 
-  async function documentVerificationAction(formData: FormData) {
+  async function documentStatusAction(formData: FormData) {
     "use server";
-    await updateDocumentVerification({
-      connectionId: id,
-      docIdProofVerified: formData.get("docIdProofVerified") === "on",
-      docAddressProofVerified: formData.get("docAddressProofVerified") === "on",
-      docElectricityBillVerified: formData.get("docElectricityBillVerified") === "on",
-      docOwnershipVerified: formData.get("docOwnershipVerified") === "on",
-      docBankPassbookVerified: formData.get("docBankPassbookVerified") === "on",
-      documentNotes: String(formData.get("documentNotes") || "") || undefined,
+    await updateDocumentStatus({
+      connectionDocumentId: String(formData.get("connectionDocumentId")),
+      status: formData.get("status") as DocumentStatus,
+      remarks: String(formData.get("remarks") || "") || undefined,
     });
   }
 
@@ -208,13 +265,93 @@ export default async function ConnectionDetailPage({
     });
   }
 
-  async function warrantyAction(formData: FormData) {
+  async function financingMethodAction(formData: FormData) {
     "use server";
-    await updateWarranty({
+    await selectFinancingMethod({
       connectionId: id,
-      warrantyStartDate: new Date(String(formData.get("warrantyStartDate"))),
-      warrantyPeriodMonths: Number(formData.get("warrantyPeriodMonths")),
-      warrantyNotes: String(formData.get("warrantyNotes") || "") || undefined,
+      method: formData.get("financingMethod") as FinancingMethod,
+    });
+  }
+
+  async function loanApplicationAction(formData: FormData) {
+    "use server";
+    const applicationDate = formData.get("applicationDate");
+    await createLoanApplication({
+      connectionId: id,
+      bankName: String(formData.get("bankName")),
+      applicationNumber: String(formData.get("applicationNumber") || "") || undefined,
+      loanAmount: Number(formData.get("loanAmount")),
+      applicationDate: applicationDate ? new Date(String(applicationDate)) : undefined,
+    });
+  }
+
+  async function loanUpdateAction(formData: FormData) {
+    "use server";
+    const sanctionedAt = formData.get("sanctionedAt");
+    const disbursedAt = formData.get("disbursedAt");
+    const paymentReceivedAt = formData.get("paymentReceivedByProprietorAt");
+    await updateLoanApplication({
+      id: String(formData.get("loanId")),
+      status: formData.get("status") as LoanStatus,
+      sanctionedAt: sanctionedAt ? new Date(String(sanctionedAt)) : undefined,
+      sanctionedAmount: formData.get("sanctionedAmount") ? Number(formData.get("sanctionedAmount")) : undefined,
+      disbursedAmount: formData.get("disbursedAmount") ? Number(formData.get("disbursedAmount")) : undefined,
+      disbursedAt: disbursedAt ? new Date(String(disbursedAt)) : undefined,
+      paymentReceivedByProprietorAmount: formData.get("paymentReceivedByProprietorAmount")
+        ? Number(formData.get("paymentReceivedByProprietorAmount"))
+        : undefined,
+      paymentReceivedByProprietorAt: paymentReceivedAt ? new Date(String(paymentReceivedAt)) : undefined,
+      paymentReference: String(formData.get("paymentReference") || "") || undefined,
+      notes: String(formData.get("loanNotes") || "") || undefined,
+    });
+  }
+
+  async function installationStatusAction(formData: FormData) {
+    "use server";
+    await updateInstallationStatus({
+      connectionId: id,
+      status: formData.get("installationStatus") as InstallationStatus,
+    });
+  }
+
+  async function installedEquipmentAction(formData: FormData) {
+    "use server";
+    const items: InstalledEquipmentItem[] = [];
+    for (let i = 0; i < 6; i++) {
+      const type = String(formData.get(`equip_${i}_type`) || "");
+      if (!type) continue;
+      items.push({
+        type: type as EquipmentType,
+        brand: String(formData.get(`equip_${i}_brand`) || "") || undefined,
+        model: String(formData.get(`equip_${i}_model`) || "") || undefined,
+        serialNumber: String(formData.get(`equip_${i}_serial`) || "") || undefined,
+        quantity: Number(formData.get(`equip_${i}_qty`) || 1),
+      });
+    }
+    await updateInstalledEquipment({ connectionId: id, items });
+  }
+
+  async function signOffAction(formData: FormData) {
+    "use server";
+    await recordInstallationSignOff({
+      connectionId: id,
+      signedOffByName: String(formData.get("signedOffByName")),
+      notes: String(formData.get("installationNotes") || "") || undefined,
+    });
+  }
+
+  async function warrantyCreateAction(formData: FormData) {
+    "use server";
+    await createWarrantyRecord({
+      connectionId: id,
+      equipmentType: formData.get("equipmentType") as EquipmentType,
+      productName: String(formData.get("productName")),
+      manufacturer: String(formData.get("manufacturer") || "") || undefined,
+      model: String(formData.get("model") || "") || undefined,
+      serialNumber: String(formData.get("serialNumber") || "") || undefined,
+      startDate: new Date(String(formData.get("startDate"))),
+      periodMonths: Number(formData.get("periodMonths")),
+      terms: String(formData.get("terms") || "") || undefined,
     });
   }
 
@@ -397,7 +534,7 @@ export default async function ConnectionDetailPage({
           <form action={propertyInspectionAction} className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="roofType">Roof type</Label>
-              <Select name="roofType" defaultValue={connection.roofType ?? undefined}>
+              <Select name="roofType" defaultValue={inspection.roofType ?? undefined}>
                 <SelectTrigger id="roofType">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -412,7 +549,7 @@ export default async function ConnectionDetailPage({
             </div>
             <div className="space-y-2">
               <Label htmlFor="roofCondition">Roof condition</Label>
-              <Select name="roofCondition" defaultValue={connection.roofCondition ?? undefined}>
+              <Select name="roofCondition" defaultValue={inspection.roofCondition ?? undefined}>
                 <SelectTrigger id="roofCondition">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -432,20 +569,20 @@ export default async function ConnectionDetailPage({
                 name="roofAreaSqft"
                 type="number"
                 step="0.01"
-                defaultValue={connection.roofAreaSqft?.toString() ?? ""}
+                defaultValue={inspection.roofAreaSqft?.toString() ?? ""}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="shadowObstruction">Shadow / obstruction</Label>
-              <Input id="shadowObstruction" name="shadowObstruction" defaultValue={connection.shadowObstruction ?? ""} />
+              <Input id="shadowObstruction" name="shadowObstruction" defaultValue={inspection.shadowObstruction ?? ""} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="orientation">Direction / orientation</Label>
-              <Input id="orientation" name="orientation" defaultValue={connection.orientation ?? ""} />
+              <Input id="orientation" name="orientation" defaultValue={inspection.orientation ?? ""} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="roofAccess">Access to roof</Label>
-              <Select name="roofAccess" defaultValue={connection.roofAccess ?? undefined}>
+              <Select name="roofAccess" defaultValue={inspection.roofAccess ?? undefined}>
                 <SelectTrigger id="roofAccess">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -463,19 +600,19 @@ export default async function ConnectionDetailPage({
               <Input
                 id="electricalConnectionDetails"
                 name="electricalConnectionDetails"
-                defaultValue={connection.electricalConnectionDetails ?? ""}
+                defaultValue={inspection.electricalConnectionDetails ?? ""}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="meterInformation">Meter information</Label>
-              <Input id="meterInformation" name="meterInformation" defaultValue={connection.meterInformation ?? ""} />
+              <Input id="meterInformation" name="meterInformation" defaultValue={inspection.meterInformation ?? ""} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="otherSiteRequirements">Other requirements</Label>
+              <Label htmlFor="otherRequirements">Other requirements</Label>
               <Input
-                id="otherSiteRequirements"
-                name="otherSiteRequirements"
-                defaultValue={connection.otherSiteRequirements ?? ""}
+                id="otherRequirements"
+                name="otherRequirements"
+                defaultValue={inspection.otherRequirements ?? ""}
               />
             </div>
             <div className="sm:col-span-3">
@@ -522,117 +659,310 @@ export default async function ConnectionDetailPage({
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <form action={documentVerificationAction} className="space-y-3">
-            {[
-              ["docIdProofVerified", "ID proof", connection.docIdProofVerified],
-              ["docAddressProofVerified", "Address proof", connection.docAddressProofVerified],
-              ["docElectricityBillVerified", "Electricity bill", connection.docElectricityBillVerified],
-              ["docOwnershipVerified", "Property ownership document", connection.docOwnershipVerified],
-              ["docBankPassbookVerified", "Bank passbook (for subsidy disbursement)", connection.docBankPassbookVerified],
-            ].map(([name, label, checked]) => (
-              <div key={name as string} className="flex items-center gap-2">
-                <Checkbox id={name as string} name={name as string} defaultChecked={checked as boolean} />
-                <Label htmlFor={name as string} className="font-normal">
-                  {label as string}
-                </Label>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {connection.connectionDocuments.filter((d) => d.status === "VERIFIED").length} /{" "}
+            {connection.connectionDocuments.length} documents verified. Manage the required-document list from{" "}
+            <Link href="/admin/settings/documents" className="underline underline-offset-4">
+              Business Profile
+            </Link>
+            .
+          </p>
+          {connection.connectionDocuments.map((doc) => (
+            <form key={doc.id} action={documentStatusAction} className="grid gap-3 sm:grid-cols-4 items-end border-b pb-3 last:border-b-0">
+              <input type="hidden" name="connectionDocumentId" value={doc.id} />
+              <div className="sm:col-span-1">
+                <Label className="font-normal">{doc.requiredDocumentType.name}</Label>
               </div>
-            ))}
-            <div className="space-y-2">
-              <Label htmlFor="documentNotes">Notes</Label>
-              <Textarea id="documentNotes" name="documentNotes" defaultValue={connection.documentNotes ?? ""} />
-            </div>
-            <Button type="submit" size="sm">Save documents</Button>
-          </form>
+              <div className="space-y-2">
+                <Select name="status" defaultValue={doc.status}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Input name="remarks" placeholder="Remarks" defaultValue={doc.remarks ?? ""} />
+              </div>
+              <div>
+                <Button type="submit" size="sm">
+                  Save
+                </Button>
+              </div>
+            </form>
+          ))}
+          {connection.connectionDocuments.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No required document types configured yet — add some from Business Profile.
+            </p>
+          )}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Government subsidy application</CardTitle>
+          <CardTitle>How is the customer paying?</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={subsidyAction} className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="subsidyScheme">Scheme</Label>
-              <Input id="subsidyScheme" name="subsidyScheme" defaultValue={connection.subsidyScheme ?? ""} />
-            </div>
+          <form action={financingMethodAction} className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
-              <Label htmlFor="subsidyStatus">Status</Label>
-              <Select name="subsidyStatus" defaultValue={connection.subsidyStatus}>
-                <SelectTrigger id="subsidyStatus">
+              <Label htmlFor="financingMethod">Financing method</Label>
+              <Select name="financingMethod" defaultValue={connection.financingMethod}>
+                <SelectTrigger id="financingMethod" className="w-64">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SUBSIDY_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="NOT_SELECTED">Not selected</SelectItem>
+                  <SelectItem value="FULL_PAYMENT">Full payment (subsidy to customer)</SelectItem>
+                  <SelectItem value="LOAN">Bank loan</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="subsidyApplicationRefNo">Application ref. no.</Label>
-              <Input
-                id="subsidyApplicationRefNo"
-                name="subsidyApplicationRefNo"
-                defaultValue={connection.subsidyApplicationRefNo ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subsidyAppliedAmount">Applied amount (₹)</Label>
-              <Input
-                id="subsidyAppliedAmount"
-                name="subsidyAppliedAmount"
-                type="number"
-                step="0.01"
-                defaultValue={connection.subsidyAppliedAmount?.toString() ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subsidyApprovedAmount">Approved amount (₹)</Label>
-              <Input
-                id="subsidyApprovedAmount"
-                name="subsidyApprovedAmount"
-                type="number"
-                step="0.01"
-                defaultValue={connection.subsidyApprovedAmount?.toString() ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subsidyAppliedAt">Applied on</Label>
-              <Input
-                id="subsidyAppliedAt"
-                name="subsidyAppliedAt"
-                type="date"
-                defaultValue={dateInputValue(connection.subsidyAppliedAt)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subsidyApprovedAt">Approved on</Label>
-              <Input
-                id="subsidyApprovedAt"
-                name="subsidyApprovedAt"
-                type="date"
-                defaultValue={dateInputValue(connection.subsidyApprovedAt)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subsidyDisbursedAt">Disbursed on</Label>
-              <Input
-                id="subsidyDisbursedAt"
-                name="subsidyDisbursedAt"
-                type="date"
-                defaultValue={dateInputValue(connection.subsidyDisbursedAt)}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Save subsidy application</Button>
-            </div>
+            <Button type="submit">Save</Button>
           </form>
         </CardContent>
       </Card>
+
+      {connection.financingMethod !== "LOAN" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Government subsidy application</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Tracking-only — this is credited by the government directly to the customer&apos;s own bank account, never
+              to us. Never sum this into revenue.
+            </p>
+            <form action={subsidyAction} className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="subsidyScheme">Scheme</Label>
+                <Input id="subsidyScheme" name="subsidyScheme" defaultValue={connection.subsidyScheme ?? ""} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subsidyStatus">Status</Label>
+                <Select name="subsidyStatus" defaultValue={connection.subsidyStatus}>
+                  <SelectTrigger id="subsidyStatus">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUBSIDY_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subsidyApplicationRefNo">Application ref. no.</Label>
+                <Input
+                  id="subsidyApplicationRefNo"
+                  name="subsidyApplicationRefNo"
+                  defaultValue={connection.subsidyApplicationRefNo ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subsidyAppliedAmount">Applied amount (₹)</Label>
+                <Input
+                  id="subsidyAppliedAmount"
+                  name="subsidyAppliedAmount"
+                  type="number"
+                  step="0.01"
+                  defaultValue={connection.subsidyAppliedAmount?.toString() ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subsidyApprovedAmount">Approved amount (₹)</Label>
+                <Input
+                  id="subsidyApprovedAmount"
+                  name="subsidyApprovedAmount"
+                  type="number"
+                  step="0.01"
+                  defaultValue={connection.subsidyApprovedAmount?.toString() ?? ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subsidyAppliedAt">Applied on</Label>
+                <Input
+                  id="subsidyAppliedAt"
+                  name="subsidyAppliedAt"
+                  type="date"
+                  defaultValue={dateInputValue(connection.subsidyAppliedAt)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subsidyApprovedAt">Approved on</Label>
+                <Input
+                  id="subsidyApprovedAt"
+                  name="subsidyApprovedAt"
+                  type="date"
+                  defaultValue={dateInputValue(connection.subsidyApprovedAt)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subsidyDisbursedAt">Disbursed on</Label>
+                <Input
+                  id="subsidyDisbursedAt"
+                  name="subsidyDisbursedAt"
+                  type="date"
+                  defaultValue={dateInputValue(connection.subsidyDisbursedAt)}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit">Save subsidy application</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
+      {connection.financingMethod === "LOAN" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Bank loan</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {currentLoanApplication ? (
+              <>
+                <div className="grid gap-1 text-sm">
+                  <p>
+                    <span className="text-muted-foreground">Bank:</span> {currentLoanApplication.bankName}
+                    {currentLoanApplication.applicationNumber ? ` · ${currentLoanApplication.applicationNumber}` : ""}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Loan amount:</span>{" "}
+                    {money(Number(currentLoanApplication.loanAmount))}
+                  </p>
+                  {loanPendingAmount !== null && (
+                    <p>
+                      <span className="text-muted-foreground">Pending from bank:</span> {money(loanPendingAmount)}
+                    </p>
+                  )}
+                </div>
+                <form action={loanUpdateAction} className="grid gap-4 sm:grid-cols-3">
+                  <input type="hidden" name="loanId" value={currentLoanApplication.id} />
+                  <div className="space-y-2">
+                    <Label htmlFor="loanStatus">Status</Label>
+                    <Select name="status" defaultValue={currentLoanApplication.status}>
+                      <SelectTrigger id="loanStatus">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LOAN_STATUSES.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s.replace(/_/g, " ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sanctionedAmount">Sanctioned amount (₹)</Label>
+                    <Input
+                      id="sanctionedAmount"
+                      name="sanctionedAmount"
+                      type="number"
+                      step="0.01"
+                      defaultValue={currentLoanApplication.sanctionedAmount?.toString() ?? ""}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sanctionedAt">Sanctioned on</Label>
+                    <Input
+                      id="sanctionedAt"
+                      name="sanctionedAt"
+                      type="date"
+                      defaultValue={dateInputValue(currentLoanApplication.sanctionedAt)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="disbursedAmount">Disbursed amount (₹)</Label>
+                    <Input
+                      id="disbursedAmount"
+                      name="disbursedAmount"
+                      type="number"
+                      step="0.01"
+                      defaultValue={currentLoanApplication.disbursedAmount?.toString() ?? ""}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="disbursedAt">Disbursed on</Label>
+                    <Input
+                      id="disbursedAt"
+                      name="disbursedAt"
+                      type="date"
+                      defaultValue={dateInputValue(currentLoanApplication.disbursedAt)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentReceivedByProprietorAmount">Received by us (₹)</Label>
+                    <Input
+                      id="paymentReceivedByProprietorAmount"
+                      name="paymentReceivedByProprietorAmount"
+                      type="number"
+                      step="0.01"
+                      defaultValue={currentLoanApplication.paymentReceivedByProprietorAmount?.toString() ?? ""}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentReceivedByProprietorAt">Received on</Label>
+                    <Input
+                      id="paymentReceivedByProprietorAt"
+                      name="paymentReceivedByProprietorAt"
+                      type="date"
+                      defaultValue={dateInputValue(currentLoanApplication.paymentReceivedByProprietorAt)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentReference">Payment reference</Label>
+                    <Input
+                      id="paymentReference"
+                      name="paymentReference"
+                      defaultValue={currentLoanApplication.paymentReference ?? ""}
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-3">
+                    <Label htmlFor="loanNotes">Notes</Label>
+                    <Textarea id="loanNotes" name="loanNotes" defaultValue={currentLoanApplication.notes ?? ""} />
+                  </div>
+                  <div>
+                    <Button type="submit">Save</Button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <form action={loanApplicationAction} className="grid gap-4 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Bank / NBFC</Label>
+                  <Input id="bankName" name="bankName" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="applicationNumber">Application no.</Label>
+                  <Input id="applicationNumber" name="applicationNumber" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="loanAmount">Loan amount (₹)</Label>
+                  <Input id="loanAmount" name="loanAmount" type="number" step="0.01" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="applicationDate">Application date</Label>
+                  <Input id="applicationDate" name="applicationDate" type="date" />
+                </div>
+                <div className="flex items-end">
+                  <Button type="submit">Create loan application</Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {items.length > 0 && (
         <Card>
@@ -691,43 +1021,166 @@ export default async function ConnectionDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            Warranty
-            {warrantyExpiryDate && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                Expires {warrantyExpiryDate.toLocaleDateString("en-IN")}
-              </span>
-            )}
-          </CardTitle>
+          <CardTitle>Installation</CardTitle>
         </CardHeader>
-        <CardContent>
-          <form action={warrantyAction} className="grid gap-4 sm:grid-cols-3">
+        <CardContent className="space-y-6">
+          <form action={installationStatusAction} className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
-              <Label htmlFor="warrantyStartDate">Warranty start date</Label>
+              <Label htmlFor="installationStatus">Status</Label>
+              <Select name="installationStatus" defaultValue={connection.installationStatus}>
+                <SelectTrigger id="installationStatus" className="w-56">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {INSTALLATION_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit">Save status</Button>
+          </form>
+
+          <div>
+            <p className="mb-2 text-sm font-medium">Installed equipment</p>
+            <form action={installedEquipmentAction} className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => {
+                const existing = installedEquipment[i];
+                return (
+                  <div key={i} className="grid gap-2 sm:grid-cols-5">
+                    <Select name={`equip_${i}_type`} defaultValue={existing?.type}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EQUIPMENT_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t.replace(/_/g, " ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input name={`equip_${i}_brand`} placeholder="Brand" defaultValue={existing?.brand ?? ""} />
+                    <Input name={`equip_${i}_model`} placeholder="Model" defaultValue={existing?.model ?? ""} />
+                    <Input
+                      name={`equip_${i}_serial`}
+                      placeholder="Serial no."
+                      defaultValue={existing?.serialNumber ?? ""}
+                    />
+                    <Input
+                      name={`equip_${i}_qty`}
+                      type="number"
+                      placeholder="Qty"
+                      defaultValue={existing?.quantity?.toString() ?? "1"}
+                    />
+                  </div>
+                );
+              })}
+              <Button type="submit" size="sm">
+                Save equipment
+              </Button>
+            </form>
+          </div>
+
+          <form action={signOffAction} className="grid gap-4 sm:grid-cols-3 border-t pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="signedOffByName">Signed off by</Label>
               <Input
-                id="warrantyStartDate"
-                name="warrantyStartDate"
-                type="date"
-                defaultValue={dateInputValue(connection.warrantyStartDate)}
-                required
+                id="signedOffByName"
+                name="signedOffByName"
+                defaultValue={connection.installationSignedOffByName ?? ""}
+                placeholder="Customer's name"
               />
             </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="installationNotes">Notes</Label>
+              <Textarea id="installationNotes" name="installationNotes" defaultValue={connection.installationNotes ?? ""} />
+            </div>
+            <div>
+              <Button type="submit">Mark installation complete</Button>
+            </div>
+            {connection.installationSignedOffAt && (
+              <p className="text-xs text-muted-foreground sm:col-span-3">
+                Signed off {connection.installationSignedOffAt.toLocaleDateString("en-IN")}. Completing this
+                auto-creates warranty records below from the equipment list, using sensible default periods you can
+                edit.
+              </p>
+            )}
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Warranty</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {warrantyRecordsWithExpiry.map((w) => (
+            <div key={w.id} className="rounded-md border p-3 text-sm">
+              <p className="font-medium">
+                {w.productName} <span className="text-muted-foreground">({w.equipmentType.replace(/_/g, " ")})</span>
+              </p>
+              <p className="text-muted-foreground">
+                {[w.manufacturer, w.model, w.serialNumber].filter(Boolean).join(" · ") || "—"}
+              </p>
+              <p>
+                {w.warrantyType.replace(/_/g, " ")} warranty · {w.periodMonths} months from{" "}
+                {w.startDate.toLocaleDateString("en-IN")} · expires {w.expiryDate.toLocaleDateString("en-IN")}
+              </p>
+            </div>
+          ))}
+          {warrantyRecordsWithExpiry.length === 0 && (
+            <p className="text-sm text-muted-foreground">No warranty records yet.</p>
+          )}
+
+          <form action={warrantyCreateAction} className="grid gap-4 sm:grid-cols-3 border-t pt-4">
             <div className="space-y-2">
-              <Label htmlFor="warrantyPeriodMonths">Period (months)</Label>
-              <Input
-                id="warrantyPeriodMonths"
-                name="warrantyPeriodMonths"
-                type="number"
-                defaultValue={connection.warrantyPeriodMonths?.toString() ?? ""}
-                required
-              />
+              <Label htmlFor="equipmentType">Equipment type</Label>
+              <Select name="equipmentType" required>
+                <SelectTrigger id="equipmentType">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EQUIPMENT_TYPES.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="productName">Product name</Label>
+              <Input id="productName" name="productName" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="manufacturer">Manufacturer</Label>
+              <Input id="manufacturer" name="manufacturer" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="model">Model</Label>
+              <Input id="model" name="model" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="serialNumber">Serial number</Label>
+              <Input id="serialNumber" name="serialNumber" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="startDate">Start date</Label>
+              <Input id="startDate" name="startDate" type="date" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="periodMonths">Period (months)</Label>
+              <Input id="periodMonths" name="periodMonths" type="number" required />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="terms">Terms</Label>
+              <Input id="terms" name="terms" />
             </div>
             <div className="flex items-end">
-              <Button type="submit">Save warranty</Button>
-            </div>
-            <div className="space-y-2 sm:col-span-3">
-              <Label htmlFor="warrantyNotes">Notes</Label>
-              <Textarea id="warrantyNotes" name="warrantyNotes" defaultValue={connection.warrantyNotes ?? ""} />
+              <Button type="submit">Add warranty record</Button>
             </div>
           </form>
         </CardContent>

@@ -29,16 +29,20 @@ model Tenant {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  users               User[]
-  leads               Lead[]
-  estimates           Estimate[]
-  inventoryItems      InventoryItem[]
-  inventoryTxns       InventoryTransaction[]
-  connections         Connection[]
-  customerPayments    CustomerPayment[]
-  staffMembers        StaffMember[]
-  leadNotes           LeadNote[]
-  sitePhotos          SitePhoto[]
+  users                 User[]
+  leads                 Lead[]
+  estimates             Estimate[]
+  inventoryItems        InventoryItem[]
+  inventoryTxns         InventoryTransaction[]
+  connections           Connection[]
+  customerPayments      CustomerPayment[]
+  staffMembers          StaffMember[]
+  leadNotes             LeadNote[]
+  sitePhotos            SitePhoto[]
+  requiredDocumentTypes RequiredDocumentType[]
+  connectionDocuments   ConnectionDocument[]
+  loanApplications      LoanApplication[]
+  warrantyRecords       WarrantyRecord[]
 }
 
 enum Role {
@@ -47,17 +51,19 @@ enum Role {
 }
 
 model User {
-  id                String   @id @default(cuid())
-  email             String   @unique
-  passwordHash      String
-  name              String
-  role              Role
-  tenantId          String?
-  tenant            Tenant?  @relation(fields: [tenantId], references: [id])
-  isActive          Boolean  @default(true)
-  mustChangePassword Boolean @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  passwordHash       String
+  name               String
+  role               Role
+  tenantId           String?
+  tenant             Tenant?  @relation(fields: [tenantId], references: [id])
+  isActive           Boolean  @default(true)
+  mustChangePassword Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  verifiedDocuments ConnectionDocument[] // documents this user uploaded/reviewed
 
   @@index([tenantId])
 }
@@ -82,22 +88,22 @@ enum LeadSource {
 }
 
 model Lead {
-  id               String     @id @default(cuid())
+  id               String      @id @default(cuid())
   tenantId         String
-  tenant           Tenant     @relation(fields: [tenantId], references: [id])
+  tenant           Tenant      @relation(fields: [tenantId], references: [id])
   customerName     String
   phone            String
   email            String?
-  address          String?    // customer address, shown on estimates and carried into the Connection on conversion
-  requirementNotes String?    // free text the Admin fills in manually from the customer conversation
-  source           LeadSource @default(OTHER)
-  stage            LeadStage  @default(NEW)
-  estimatedValue   Decimal?   @db.Decimal(12, 2)
+  address          String? // customer address, shown on estimates and carried into the Connection on conversion
+  requirementNotes String? // free text the Admin fills in manually from the customer conversation
+  source           LeadSource  @default(OTHER)
+  stage            LeadStage   @default(NEW)
+  estimatedValue   Decimal?    @db.Decimal(12, 2)
   notes            LeadNote[]
   estimates        Estimate[]
   connection       Connection?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
 
   @@index([tenantId, stage])
 }
@@ -131,7 +137,7 @@ model Estimate {
   isCurrent       Boolean        @default(true)
   systemSizeKw    Decimal?       @db.Decimal(6, 2)
   brand           SolarBrand?
-  lineItems       Json           // {description, spec?, qty, rate, amount}[] — read/rendered as one document, never queried individually
+  lineItems       Json // {description, spec?, qty, rate, amount}[] — read/rendered as one document, never queried individually
   subtotal        Decimal        @db.Decimal(12, 2)
   gstPercent      Decimal        @default(0) @db.Decimal(5, 2)
   gstAmount       Decimal        @default(0) @db.Decimal(12, 2)
@@ -139,7 +145,7 @@ model Estimate {
   subsidyEstimate Decimal?       @db.Decimal(12, 2)
   status          EstimateStatus @default(DRAFT)
   validUntil      DateTime?
-  notes           String?        // terms & conditions shown on the printed estimate
+  notes           String? // terms & conditions shown on the printed estimate
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
@@ -240,31 +246,66 @@ enum SiteVisitResult {
   REQUIRES_FURTHER_INSPECTION
 }
 
-enum RoofType {
-  RCC
-  TIN
-  TILED
-  OTHER
-}
-
-enum RoofCondition {
-  GOOD
-  NEEDS_REPAIR
-  POOR
-}
-
-enum RoofAccess {
-  EASY
-  LADDER_REQUIRED
-  DIFFICULT
-}
-
 enum SitePhotoCategory {
   ROOF
   METER
   INSTALL_AREA
   DB_PANEL
   OTHER
+}
+
+// ---------- Documents / Subsidy-Loan / Installation / Warranty ----------
+
+enum DocumentStatus {
+  NOT_UPLOADED
+  UPLOADED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  REUPLOAD_REQUIRED
+}
+
+enum FinancingMethod {
+  NOT_SELECTED
+  FULL_PAYMENT
+  LOAN
+}
+
+enum LoanStatus {
+  NOT_REQUIRED
+  APPLICATION_PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  DISBURSED
+  COMPLETED
+}
+
+enum InstallationStatus {
+  PENDING
+  SCHEDULED
+  TEAM_ASSIGNED
+  IN_PROGRESS
+  INSPECTION_PENDING
+  COMPLETED
+}
+
+enum EquipmentType {
+  PANEL
+  INVERTER
+  MOUNTING_STRUCTURE
+  DC_CABLE
+  AC_CABLE
+  EARTHING_KIT
+  LIGHTNING_ARRESTOR
+  NET_METER
+  OTHER
+}
+
+enum WarrantyType {
+  PRODUCT
+  PERFORMANCE
+  WORKMANSHIP
 }
 
 model Connection {
@@ -284,44 +325,54 @@ model Connection {
   staffMember       StaffMember?     @relation(fields: [staffMemberId], references: [id])
 
   // Site visit
-  siteVisitStatus             SiteVisitStatus @default(PENDING)
-  siteVisitScheduledAt        DateTime?
-  siteVisitInstructions       String?
-  roofType                    RoofType?
-  roofCondition               RoofCondition?
-  roofAreaSqft                Decimal?        @db.Decimal(8, 2)
-  shadowObstruction           String?
-  orientation                 String?
-  roofAccess                  RoofAccess?
-  electricalConnectionDetails String?
-  meterInformation            String?
-  otherSiteRequirements       String?
-  siteVisitResult             SiteVisitResult?
-  siteVisitWorkerNotes        String?
-  sitePhotos                  SitePhoto[]
+  siteVisitStatus       SiteVisitStatus  @default(PENDING)
+  siteVisitScheduledAt  DateTime?
+  siteVisitInstructions String?
+  // Property-inspection fields, as one JSON blob rather than individually
+  // typed columns — this is exactly the kind of business-specific data
+  // shape likely to differ between solar proprietors, so it stays flexible
+  // per-tenant instead of locking the schema to this one proprietor's
+  // fields. Shape: {roofType, roofCondition, roofAreaSqft,
+  // shadowObstruction, orientation, roofAccess,
+  // electricalConnectionDetails, meterInformation, otherRequirements}.
+  // See SiteInspectionDetails in src/server/connections.ts.
+  siteInspectionDetails Json?
+  siteVisitResult       SiteVisitResult?
+  siteVisitWorkerNotes  String?
+  sitePhotos            SitePhoto[]
 
-  // Document verification — fixed checklist for the standard PM Surya Ghar subsidy docs
-  docIdProofVerified         Boolean @default(false)
-  docAddressProofVerified    Boolean @default(false)
-  docElectricityBillVerified Boolean @default(false)
-  docOwnershipVerified       Boolean @default(false)
-  docBankPassbookVerified    Boolean @default(false)
-  documentNotes              String?
+  // Document verification — configurable per tenant via RequiredDocumentType/ConnectionDocument
+  connectionDocuments ConnectionDocument[]
 
-  // Government subsidy application
-  subsidyScheme           String?       @default("PM Surya Ghar Muft Bijli Yojana")
+  // Government subsidy application (Option A: paid in full, subsidy credited
+  // directly to the CUSTOMER's own bank account — this is tracking-only,
+  // never proprietor revenue) vs. Option B: bank loan (LoanApplication)
+  financingMethod         FinancingMethod   @default(NOT_SELECTED)
+  subsidyScheme           String?           @default("PM Surya Ghar Muft Bijli Yojana")
   subsidyApplicationRefNo String?
-  subsidyAppliedAmount    Decimal?      @db.Decimal(12, 2)
-  subsidyApprovedAmount   Decimal?      @db.Decimal(12, 2)
-  subsidyStatus           SubsidyStatus @default(NOT_APPLIED)
+  subsidyAppliedAmount    Decimal?          @db.Decimal(12, 2)
+  subsidyApprovedAmount   Decimal?          @db.Decimal(12, 2)
+  subsidyStatus           SubsidyStatus     @default(NOT_APPLIED)
   subsidyAppliedAt        DateTime?
   subsidyApprovedAt       DateTime?
   subsidyDisbursedAt      DateTime?
+  loanApplications        LoanApplication[]
 
-  // Warranty (only meaningful once COMPLETED, but not hard-gated)
-  warrantyStartDate    DateTime?
-  warrantyPeriodMonths Int?
-  warrantyNotes        String?
+  // Installation
+  installationStatus          InstallationStatus @default(PENDING)
+  installationNotes           String?
+  installationSignedOffAt     DateTime?
+  installationSignedOffByName String?
+  // Array of {type, brand, model, serialNumber, quantity, notes} — same
+  // pattern as Estimate.lineItems: always read/edited together per
+  // connection, never queried individually across connections.
+  installedEquipment          Json?
+
+  // Warranty — kept as real WarrantyRecord rows (not JSON), the one
+  // deliberate exception to the JSON-for-variable-shape-data rule above,
+  // because it needs to support a future cross-connection "expiring soon"
+  // dashboard that's much easier against real columns than a JSON blob.
+  warrantyRecords WarrantyRecord[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -330,6 +381,101 @@ model Connection {
   payments      CustomerPayment[]
 
   @@index([tenantId, status])
+}
+
+model RequiredDocumentType {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  description  String?
+  isActive     Boolean  @default(true)
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  connectionDocuments ConnectionDocument[]
+
+  @@index([tenantId, isActive])
+}
+
+model ConnectionDocument {
+  id                     String               @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id])
+  connectionId           String
+  connection             Connection           @relation(fields: [connectionId], references: [id])
+  requiredDocumentTypeId String
+  requiredDocumentType   RequiredDocumentType @relation(fields: [requiredDocumentTypeId], references: [id])
+  status                 DocumentStatus       @default(NOT_UPLOADED)
+  filePath               String? // same public/uploads/<tenantId>/<connectionId>/<uuid> pattern as SitePhoto
+  originalName           String?
+  uploadedAt             DateTime?
+  uploadedById           String?
+  uploadedBy             User?                @relation(fields: [uploadedById], references: [id])
+  remarks                String?
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  @@index([tenantId, connectionId])
+  @@index([tenantId, requiredDocumentTypeId])
+}
+
+model LoanApplication {
+  id           String     @id @default(cuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id])
+  // Supports the reapplication case (rejected -> reapplied elsewhere) —
+  // mirrors Estimate.version/isCurrent.
+  isCurrent    Boolean    @default(true)
+
+  bankName                          String
+  applicationNumber                 String?
+  loanAmount                        Decimal    @db.Decimal(12, 2)
+  applicationDate                   DateTime?
+  status                            LoanStatus @default(APPLICATION_PENDING)
+  sanctionedAt                      DateTime?
+  sanctionedAmount                  Decimal?   @db.Decimal(12, 2)
+  disbursedAmount                   Decimal?   @db.Decimal(12, 2)
+  disbursedAt                       DateTime?
+  // The only slice of this that is actual proprietor revenue — customer
+  // payment (CustomerPayment) and subsidy (Connection.subsidy*) are
+  // tracked separately and must never be summed with this.
+  paymentReceivedByProprietorAmount Decimal?   @db.Decimal(12, 2)
+  paymentReceivedByProprietorAt     DateTime?
+  paymentReference                  String?
+  notes                             String?
+  createdAt                         DateTime   @default(now())
+  updatedAt                         DateTime   @updatedAt
+
+  @@index([tenantId, connectionId])
+}
+
+model WarrantyRecord {
+  id           String     @id @default(cuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  connectionId String
+  connection   Connection @relation(fields: [connectionId], references: [id])
+
+  equipmentType EquipmentType
+  productName   String
+  manufacturer  String?
+  model         String?
+  serialNumber  String?
+  warrantyType  WarrantyType  @default(PRODUCT)
+  startDate     DateTime
+  periodMonths  Int // e.g. 300 for 25yr panels, 60-120 for 5-10yr inverters
+  terms         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // No stored expiry date — computed at read time (startDate + periodMonths),
+  // same convention already used for Connection's profit figure.
+
+  @@index([tenantId, connectionId])
 }
 
 model CustomerPayment {
