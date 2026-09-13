@@ -10,9 +10,9 @@ import {
   type EstimateLineItem,
   type getLead,
 } from "@/server/leads";
-import { EstimateBuilderWithPreview, DEFAULT_ROWS } from "./estimate-builder-with-preview";
+import { EstimateBuilderWithPreview } from "./estimate-builder-with-preview";
 import { SOLAR_BRANDS, type SolarBrandValue } from "@/lib/estimateBrands";
-import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
+import { DEFAULT_ESTIMATE_TERMS, DEFAULT_ESTIMATE_ROWS } from "@/lib/estimateDefaults";
 import { isEstimateLocked, STAGE_ORDER, type ConnectionStageKey } from "@/lib/connectionStage";
 import type { EstimateStatus } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
@@ -111,7 +111,7 @@ export async function EstimateWorkflowSection({
     "use server";
     await createEstimate({
       leadId,
-      lineItems: DEFAULT_ROWS.map((r) => ({ ...r, amount: 0 })),
+      lineItems: DEFAULT_ESTIMATE_ROWS.map((r) => ({ ...r, amount: 0 })),
     });
   }
 

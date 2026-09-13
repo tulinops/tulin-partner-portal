@@ -8,19 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { SOLAR_BRANDS, buildBrandLineItems, brandLabel, type SolarBrandValue } from "@/lib/estimateBrands";
 import { amountInWords } from "@/lib/amountInWords";
+import { DEFAULT_ESTIMATE_ROWS, type EstimateBuilderRow } from "@/lib/estimateDefaults";
 
-export type EstimateBuilderRow = { description: string; spec: string; qty: number; rate: number };
-
-export const DEFAULT_ROWS: EstimateBuilderRow[] = [
-  { description: "Solar PV Module", spec: "", qty: 1, rate: 0 },
-  { description: "Solar Inverter", spec: "", qty: 1, rate: 0 },
-  { description: "Solar Mounting Structure", spec: "Hot Dip Galvanized / Aluminium Structure", qty: 1, rate: 0 },
-  { description: "DC Solar Cable", spec: "UV Resistant DC Solar Cable", qty: 1, rate: 0 },
-  { description: "AC Cable", spec: "Copper / Aluminium AC Cable", qty: 1, rate: 0 },
-  { description: "MC4 Connectors", spec: "Original Compatible MC4 Connectors", qty: 4, rate: 0 },
-  { description: "Earthing & Lightning Protection", spec: "Complete Earthing & Lightning Protection System", qty: 1, rate: 0 },
-  { description: "Installation & Commissioning", spec: "Complete Solar System Installation & Commissioning", qty: 1, rate: 0 },
-];
+export type { EstimateBuilderRow };
 
 const INACTIVE_BRAND_BTN =
   "rounded-md border-2 border-[#16823b] bg-white px-4 py-2 text-sm font-bold text-[#16823b] disabled:cursor-not-allowed disabled:opacity-45";
@@ -70,7 +60,7 @@ export function EstimateBuilderWithPreview({
 }) {
   const [capacity, setCapacity] = useState(initialCapacity ? String(initialCapacity) : "");
   const [brand, setBrand] = useState<SolarBrandValue | "">(initialBrand ?? "");
-  const [rows, setRows] = useState<EstimateBuilderRow[]>(initialRows ?? DEFAULT_ROWS);
+  const [rows, setRows] = useState<EstimateBuilderRow[]>(initialRows ?? DEFAULT_ESTIMATE_ROWS);
   const [gstPercent, setGstPercent] = useState(String(initialGstPercent));
   const [subsidyEstimate, setSubsidyEstimate] = useState(
     initialSubsidyEstimate ? String(initialSubsidyEstimate) : "",

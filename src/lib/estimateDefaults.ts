@@ -1,3 +1,20 @@
+export type EstimateBuilderRow = { description: string; spec: string; qty: number; rate: number };
+
+// Plain data, deliberately NOT in estimate-builder-with-preview.tsx (a "use
+// client" file) — a server action importing a data export from a client
+// module gets a client-reference wrapper instead of the real value at
+// runtime, not the array itself, so .map() on it throws.
+export const DEFAULT_ESTIMATE_ROWS: EstimateBuilderRow[] = [
+  { description: "Solar PV Module", spec: "", qty: 1, rate: 0 },
+  { description: "Solar Inverter", spec: "", qty: 1, rate: 0 },
+  { description: "Solar Mounting Structure", spec: "Hot Dip Galvanized / Aluminium Structure", qty: 1, rate: 0 },
+  { description: "DC Solar Cable", spec: "UV Resistant DC Solar Cable", qty: 1, rate: 0 },
+  { description: "AC Cable", spec: "Copper / Aluminium AC Cable", qty: 1, rate: 0 },
+  { description: "MC4 Connectors", spec: "Original Compatible MC4 Connectors", qty: 4, rate: 0 },
+  { description: "Earthing & Lightning Protection", spec: "Complete Earthing & Lightning Protection System", qty: 1, rate: 0 },
+  { description: "Installation & Commissioning", spec: "Complete Solar System Installation & Commissioning", qty: 1, rate: 0 },
+];
+
 // Shared between the create-estimate form (as defaultValue) and the print
 // page (as a fallback for older estimates saved before this constant
 // existed) so the two are never out of sync with each other.
