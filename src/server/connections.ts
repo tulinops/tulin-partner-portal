@@ -5,7 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
-import { computeConnectionStage, isEstimateLocked } from "@/lib/connectionStage";
+import { computeConnectionStage } from "@/lib/connectionStage";
 import type {
   ConnectionStatus,
   SubsidyStatus,
@@ -24,6 +24,37 @@ export async function listConnections() {
   return db.connection.findMany({
     include: { payments: true, inventoryTxns: true },
     orderBy: { createdAt: "desc" },
+  });
+}
+
+// Used by leads.ts to evaluate estimate-lock state without duplicating the
+// stage-computation query shape — a lead's Connection (if any) determines
+// whether its final estimate has moved past the point where pricing freezes.
+export async function getConnectionStageForLead(leadId: string) {
+  const { db } = await getTenantDb();
+  const connection = await db.connection.findFirst({
+    where: { leadId },
+    include: {
+      connectionDocuments: true,
+      loanApplications: { orderBy: { createdAt: "desc" } },
+      warrantyRecords: true,
+    },
+  });
+  if (!connection) return null;
+
+  const documentsVerified =
+    connection.connectionDocuments.length > 0 &&
+    connection.connectionDocuments.every((d) => d.status === "VERIFIED");
+  const currentLoanApplication = connection.loanApplications.find((l) => l.isCurrent) ?? null;
+
+  return computeConnectionStage({
+    siteVisitStatus: connection.siteVisitStatus,
+    documentsVerified,
+    subsidyStatus: connection.subsidyStatus,
+    currentLoanStatus: currentLoanApplication?.status ?? null,
+    installationStatus: connection.installationStatus,
+    connectionStatus: connection.status,
+    warrantyRecordCount: connection.warrantyRecords.length,
   });
 }
 
@@ -85,12 +116,6 @@ export async function getConnectionDetail(connectionId: string) {
     warrantyRecordCount: connection.warrantyRecords.length,
   });
 
-  const estimateLocked = isEstimateLocked({
-    financingMethod: connection.financingMethod,
-    subsidyStatus: connection.subsidyStatus,
-    loanApplicationsCount: connection.loanApplications.length,
-  });
-
   return {
     connection,
     amountCollected,
@@ -103,7 +128,6 @@ export async function getConnectionDetail(connectionId: string) {
     siteInspectionDetails,
     installedEquipment,
     stage,
-    estimateLocked,
   };
 }
 

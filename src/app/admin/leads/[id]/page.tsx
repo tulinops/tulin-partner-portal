@@ -1,40 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  getLead,
-  moveLeadStage,
-  addLeadNote,
-  updateLeadDetails,
-  createEstimate,
-  type EstimateLineItem,
-} from "@/server/leads";
+import { getLead, moveLeadStage, addLeadNote, updateLeadDetails } from "@/server/leads";
+import { getConnectionStageForLead } from "@/server/connections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { EstimateBuilderWithPreview } from "./estimate-builder-with-preview";
+import { EstimateWorkflowSection } from "./estimate-workflow-section";
 import { CustomerTabs } from "@/app/admin/connections/[id]/customer-tabs";
-import { SOLAR_BRANDS, type SolarBrandValue } from "@/lib/estimateBrands";
-import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
 import { getBusinessProfile } from "@/server/business-profile";
 
 const STAGES = ["NEW", "CONTACTED", "SITE_VISIT", "QUOTED", "WON", "LOST"] as const;
-const LINE_ITEM_ROW_COUNT = 8;
-
-function defaultValidUntil() {
-  return new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
 
 const NOT_YET_A_CUSTOMER = (
   <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -45,16 +23,20 @@ const NOT_YET_A_CUSTOMER = (
 
 export default async function LeadDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ quote?: string }>;
 }) {
   const { id } = await params;
+  const { quote: activeEstimateId } = await searchParams;
   const lead = await getLead(id);
   if (!lead) notFound();
   const tenant = await getBusinessProfile();
+  const connectionStage = lead.connection ? await getConnectionStageForLead(id) : null;
 
   const currentEstimate = lead.estimates.find((e) => e.isCurrent);
-  const stage = currentEstimate ? "estimate" : "lead";
+  const stage = connectionStage ?? (lead.estimates.length > 0 ? "estimate" : "lead");
 
   async function moveStageAction(formData: FormData) {
     "use server";
@@ -78,42 +60,6 @@ export default async function LeadDetailPage({
       email: String(formData.get("email") || "") || undefined,
       address: String(formData.get("address") || "") || undefined,
       requirementNotes: String(formData.get("requirementNotes") || "") || undefined,
-    });
-  }
-
-  async function createEstimateAction(formData: FormData) {
-    "use server";
-    const lineItems: EstimateLineItem[] = [];
-    for (let i = 0; i < LINE_ITEM_ROW_COUNT; i++) {
-      const description = String(formData.get(`item_${i}_description`) || "");
-      if (!description.trim()) continue;
-      lineItems.push({
-        description,
-        spec: String(formData.get(`item_${i}_spec`) || ""),
-        qty: Number(formData.get(`item_${i}_qty`) || 0),
-        rate: Number(formData.get(`item_${i}_rate`) || 0),
-        amount: 0, // recomputed server-side in createEstimate
-      });
-    }
-
-    const systemSizeKw = formData.get("systemSizeKw");
-    const gstPercent = formData.get("gstPercent");
-    const subsidyEstimate = formData.get("subsidyEstimate");
-    const validUntil = formData.get("validUntil");
-    // FormData is untrusted input — validate against the known brand list
-    // before it reaches a typed Prisma enum column.
-    const rawBrand = String(formData.get("brand") || "");
-    const brand = SOLAR_BRANDS.some((b) => b.value === rawBrand) ? (rawBrand as SolarBrandValue) : undefined;
-
-    await createEstimate({
-      leadId: id,
-      systemSizeKw: systemSizeKw ? Number(systemSizeKw) : undefined,
-      brand,
-      lineItems,
-      gstPercent: gstPercent ? Number(gstPercent) : undefined,
-      subsidyEstimate: subsidyEstimate ? Number(subsidyEstimate) : undefined,
-      validUntil: validUntil ? new Date(String(validUntil)) : undefined,
-      notes: String(formData.get("notes") || "") || undefined,
     });
   }
 
@@ -216,69 +162,26 @@ export default async function LeadDetailPage({
   const estimateSection = (
     <Card>
       <CardHeader>
-        <CardTitle>Estimates</CardTitle>
+        <CardTitle>Estimate</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>No.</TableHead>
-              <TableHead>Version</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {lead.estimates.map((e) => (
-              <TableRow key={e.id}>
-                <TableCell>{e.estimateNumber}</TableCell>
-                <TableCell>
-                  v{e.version}
-                  {e.isCurrent && <Badge className="ml-2">current</Badge>}
-                </TableCell>
-                <TableCell>₹{Number(e.totalAmount).toLocaleString("en-IN")}</TableCell>
-                <TableCell>{e.status}</TableCell>
-                <TableCell>{e.createdAt.toLocaleDateString("en-IN")}</TableCell>
-                <TableCell>
-                  <Link href={`/admin/estimates/${e.id}`} className="underline underline-offset-4" target="_blank">
-                    View / Print →
-                  </Link>
-                </TableCell>
-              </TableRow>
-            ))}
-            {lead.estimates.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
-                  No estimates yet.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-
-        <Separator />
-
-        <form action={createEstimateAction} className="space-y-4">
-          <h3 className="text-sm font-semibold">Create new estimate</h3>
-
-          <EstimateBuilderWithPreview
-            customerName={lead.customerName}
-            phone={lead.phone}
-            email={lead.email}
-            address={lead.address}
-            tenantName={tenant?.name ?? "Your Business"}
-            tenantAddress={tenant?.businessAddress}
-            tenantGstin={tenant?.gstin}
-            tenantPhone={tenant?.contactPhone}
-            tenantEmail={tenant?.contactEmail}
-            defaultValidUntil={defaultValidUntil()}
-            initialNotes={DEFAULT_ESTIMATE_TERMS}
-          />
-
-          <Button type="submit">Create estimate</Button>
-        </form>
+      <CardContent>
+        <EstimateWorkflowSection
+          leadId={id}
+          estimates={lead.estimates}
+          activeEstimateId={activeEstimateId}
+          connectionStage={connectionStage}
+          hasConnection={!!lead.connection}
+          basePath={`/admin/leads/${id}`}
+          customerName={lead.customerName}
+          phone={lead.phone}
+          email={lead.email}
+          address={lead.address}
+          tenantName={tenant?.name ?? "Your Business"}
+          tenantAddress={tenant?.businessAddress}
+          tenantGstin={tenant?.gstin}
+          tenantPhone={tenant?.contactPhone}
+          tenantEmail={tenant?.contactEmail}
+        />
       </CardContent>
     </Card>
   );

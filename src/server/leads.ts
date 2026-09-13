@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
+import { getConnectionStageForLead } from "@/server/connections";
+import { isEstimateLocked, STAGE_ORDER } from "@/lib/connectionStage";
 import type { LeadSource, LeadStage, EstimateStatus, SolarBrand } from "@/generated/prisma/enums";
+import type { TenantScopedClient } from "@/lib/db";
 
 export async function listLeads() {
   const { db } = await getTenantDb();
@@ -64,6 +67,34 @@ export async function updateLeadDetails(input: {
   revalidatePath(`/admin/leads/${input.leadId}`);
 }
 
+// The interactive-transaction client Prisma hands to a $transaction callback
+// omits $connect/$disconnect/$extends/etc — it is not quite TenantScopedClient
+// itself, so it's derived here rather than reusing that type directly.
+type TenantTxClient = Parameters<Parameters<TenantScopedClient["$transaction"]>[0]>[0];
+
+// Shared by moveLeadStage("WON") and scheduleSiteVisit() — both are really
+// "start the customer journey" triggered from different places in the UI,
+// so they must produce the identical Connection, not two slightly-different
+// paths to the same outcome.
+async function createConnectionFromLead(
+  tx: TenantTxClient,
+  lead: { id: string; customerName: string; phone: string; address: string | null },
+  tenantId: string,
+  systemSizeKw: number | undefined,
+) {
+  await tx.lead.update({ where: { id: lead.id }, data: { stage: "WON" } });
+  await tx.connection.create({
+    data: {
+      tenantId,
+      leadId: lead.id,
+      customerName: lead.customerName,
+      phone: lead.phone,
+      address: lead.address ?? undefined,
+      systemSizeKw: systemSizeKw ?? undefined,
+    },
+  });
+}
+
 export async function moveLeadStage(leadId: string, stage: LeadStage) {
   const { db, tenantId } = await getTenantDb();
 
@@ -76,21 +107,12 @@ export async function moveLeadStage(leadId: string, stage: LeadStage) {
 
     // Moving a lead to Won is what starts the customer journey — create the
     // Connection automatically here instead of a separate manual step, using
-    // whatever address/system size the lead and its current estimate already have.
+    // whatever address/system size the lead and its final estimate already have.
     if (!lead.connection) {
-      await db.$transaction(async (tx) => {
-        await tx.lead.update({ where: { id: lead.id }, data: { stage: "WON" } });
-        await tx.connection.create({
-          data: {
-            tenantId,
-            leadId: lead.id,
-            customerName: lead.customerName,
-            phone: lead.phone,
-            address: lead.address ?? undefined,
-            systemSizeKw: lead.estimates[0]?.systemSizeKw ?? undefined,
-          },
-        });
-      });
+      const systemSizeKw = lead.estimates[0]?.systemSizeKw;
+      await db.$transaction((tx) =>
+        createConnectionFromLead(tx, lead, tenantId, systemSizeKw ? Number(systemSizeKw) : undefined),
+      );
       revalidatePath("/admin/leads");
       revalidatePath(`/admin/leads/${leadId}`);
       revalidatePath("/admin/connections");
@@ -101,6 +123,30 @@ export async function moveLeadStage(leadId: string, stage: LeadStage) {
   await db.lead.update({ where: { id: leadId }, data: { stage } });
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);
+}
+
+// The "Schedule site visit →" action from the Estimate tab — the other path
+// (besides marking a lead Won) that starts the customer journey, once a
+// quotation has been approved. A no-op if the Connection already exists.
+export async function scheduleSiteVisit(leadId: string) {
+  const { db, tenantId } = await getTenantDb();
+  const lead = await db.lead.findFirst({
+    where: { id: leadId },
+    include: { connection: true, estimates: { where: { isCurrent: true }, take: 1 } },
+  });
+  if (!lead) throw new Error("Lead not found");
+  if (lead.connection) return;
+
+  const finalEstimate = lead.estimates[0];
+  if (!finalEstimate) throw new Error("Approve a quotation before scheduling the site visit");
+
+  const systemSizeKw = finalEstimate.systemSizeKw;
+  await db.$transaction((tx) =>
+    createConnectionFromLead(tx, lead, tenantId, systemSizeKw ? Number(systemSizeKw) : undefined),
+  );
+  revalidatePath("/admin/leads");
+  revalidatePath(`/admin/leads/${leadId}`);
+  revalidatePath("/admin/connections");
 }
 
 export async function addLeadNote(input: {
@@ -180,44 +226,186 @@ export async function createEstimate(input: {
   const totalAmount = subtotal + gstAmount;
   const estimateNumber = await generateEstimateNumber(tenant.slug);
 
-  await db.$transaction(async (tx) => {
-    const prior = await tx.estimate.count({ where: { leadId: input.leadId } });
-    await tx.estimate.updateMany({
-      where: { leadId: input.leadId },
-      data: { isCurrent: false },
-    });
-    await tx.estimate.create({
-      data: {
-        tenantId,
-        leadId: input.leadId,
-        estimateNumber,
-        version: prior + 1,
-        isCurrent: true,
-        systemSizeKw: input.systemSizeKw,
-        brand: input.brand,
-        lineItems: items,
-        subtotal,
-        gstPercent,
-        gstAmount,
-        totalAmount,
-        subsidyEstimate: input.subsidyEstimate,
-        validUntil: input.validUntil,
-        notes: input.notes,
-      },
-    });
+  // Quotations coexist rather than superseding one another — a lead can have
+  // several simultaneous DRAFT quotes, and only Approving one ever makes it
+  // isCurrent (the final quote). See updateEstimateStatus.
+  const prior = await db.estimate.count({ where: { leadId: input.leadId } });
+  await db.estimate.create({
+    data: {
+      tenantId,
+      leadId: input.leadId,
+      estimateNumber,
+      version: prior + 1,
+      isCurrent: false,
+      systemSizeKw: input.systemSizeKw,
+      brand: input.brand,
+      lineItems: items,
+      subtotal,
+      gstPercent,
+      gstAmount,
+      totalAmount,
+      subsidyEstimate: input.subsidyEstimate,
+      validUntil: input.validUntil,
+      notes: input.notes,
+    },
   });
 
   revalidatePath(`/admin/leads/${input.leadId}`);
 }
 
+// Copies an existing quote as a new DRAFT — used for both the mockup's
+// "Duplicate" action and for starting a revision off an already-final quote.
+export async function duplicateEstimate(estimateId: string) {
+  const { db, tenantId } = await getTenantDb();
+  const original = await db.estimate.findFirst({ where: { id: estimateId } });
+  if (!original) throw new Error("Estimate not found");
+
+  const tenant = await db.tenant.findFirst({ where: { id: tenantId } });
+  if (!tenant) throw new Error("Tenant not found");
+
+  const prior = await db.estimate.count({ where: { leadId: original.leadId } });
+  const created = await db.estimate.create({
+    data: {
+      tenantId,
+      leadId: original.leadId,
+      estimateNumber: await generateEstimateNumber(tenant.slug),
+      version: prior + 1,
+      isCurrent: false,
+      status: "DRAFT",
+      systemSizeKw: original.systemSizeKw ?? undefined,
+      brand: original.brand ?? undefined,
+      lineItems: original.lineItems as object,
+      subtotal: original.subtotal,
+      gstPercent: original.gstPercent,
+      gstAmount: original.gstAmount,
+      totalAmount: original.totalAmount,
+      subsidyEstimate: original.subsidyEstimate ?? undefined,
+      validUntil: original.validUntil ?? undefined,
+      notes: original.notes ?? undefined,
+    },
+  });
+
+  revalidatePath(`/admin/leads/${original.leadId}`);
+  return created.id;
+}
+
+async function assertEstimateEditable(
+  db: TenantScopedClient,
+  estimate: { id: string; leadId: string; status: string; isCurrent: boolean },
+) {
+  const hasOtherFinalEstimate = await db.estimate.count({
+    where: { leadId: estimate.leadId, isCurrent: true, id: { not: estimate.id } },
+  });
+  const connectionStage = await getConnectionStageForLead(estimate.leadId);
+  const locked = isEstimateLocked({
+    status: estimate.status,
+    isCurrent: estimate.isCurrent,
+    hasOtherFinalEstimate: hasOtherFinalEstimate > 0,
+    connectionStage,
+  });
+  if (locked) throw new Error("This quotation is locked and can no longer be edited");
+}
+
+// Recomputes totals the same way createEstimate does — the two must never
+// drift, since a quote can move between "new" and "edited" freely while DRAFT.
+export async function updateEstimateFields(
+  estimateId: string,
+  input: {
+    systemSizeKw?: number;
+    brand?: SolarBrand;
+    lineItems?: EstimateLineItem[];
+    gstPercent?: number;
+    subsidyEstimate?: number;
+    validUntil?: Date;
+    notes?: string;
+  },
+) {
+  const { db } = await getTenantDb();
+  const estimate = await db.estimate.findFirst({ where: { id: estimateId } });
+  if (!estimate) throw new Error("Estimate not found");
+  await assertEstimateEditable(db, estimate);
+
+  const items = input.lineItems
+    ?.filter((li) => li.description.trim().length > 0)
+    .map((li) => ({ ...li, amount: li.qty * li.rate }));
+  const subtotal = items?.reduce((sum, li) => sum + li.amount, 0);
+  const gstPercent = input.gstPercent ?? Number(estimate.gstPercent);
+  const gstAmount = subtotal !== undefined ? subtotal * (gstPercent / 100) : undefined;
+  const totalAmount = subtotal !== undefined && gstAmount !== undefined ? subtotal + gstAmount : undefined;
+
+  await db.estimate.update({
+    where: { id: estimateId },
+    data: {
+      systemSizeKw: input.systemSizeKw,
+      brand: input.brand,
+      lineItems: items,
+      subtotal,
+      gstPercent: input.gstPercent,
+      gstAmount,
+      totalAmount,
+      subsidyEstimate: input.subsidyEstimate,
+      validUntil: input.validUntil,
+      notes: input.notes,
+    },
+  });
+  revalidatePath(`/admin/leads/${estimate.leadId}`);
+}
+
+// Deliberately more lenient than assertEstimateEditable: approving a DRAFT
+// swaps which quote is final, so a non-final quote must stay approvable even
+// though its *fields* are read-only once another quote has been finalized.
+// The only hard stops are an explicit LOCKED status, or the job having
+// already moved into Subsidy/Loan or later — at that point no quote's status
+// can change at all, final or not.
+async function assertEstimateStatusChangeAllowed(estimate: { leadId: string; status: string }) {
+  if (estimate.status === "LOCKED") {
+    throw new Error("This quotation is locked and can no longer be changed");
+  }
+  const connectionStage = await getConnectionStageForLead(estimate.leadId);
+  if (connectionStage !== null && STAGE_ORDER.indexOf(connectionStage) >= STAGE_ORDER.indexOf("subsidyloan")) {
+    throw new Error("This lead has moved past the estimate stage; quotations are locked");
+  }
+}
+
+// Approving a quote (status -> ACCEPTED) is what makes it the lead's final
+// quotation: it becomes isCurrent, and any previously-final quote is demoted
+// back to SENT and loses isCurrent, matching the mockup's
+// onEstStatusChange/"Approved" behavior.
 export async function updateEstimateStatus(estimateId: string, status: EstimateStatus) {
   const { db } = await getTenantDb();
   const estimate = await db.estimate.findFirst({ where: { id: estimateId } });
   if (!estimate) throw new Error("Estimate not found");
+  await assertEstimateStatusChangeAllowed(estimate);
 
-  await db.estimate.update({ where: { id: estimateId }, data: { status } });
+  if (status === "ACCEPTED") {
+    await db.$transaction(async (tx) => {
+      await tx.estimate.updateMany({
+        where: { leadId: estimate.leadId, isCurrent: true, id: { not: estimateId } },
+        data: { isCurrent: false, status: "SENT" },
+      });
+      await tx.estimate.update({ where: { id: estimateId }, data: { status: "ACCEPTED", isCurrent: true } });
+    });
+  } else {
+    await db.estimate.update({ where: { id: estimateId }, data: { status } });
+  }
+
   revalidatePath(`/admin/leads/${estimate.leadId}`);
   revalidatePath(`/admin/estimates/${estimateId}`);
+}
+
+// Refuses to leave a lead with zero quotations — there must always be at
+// least one to build from.
+export async function deleteEstimate(estimateId: string) {
+  const { db } = await getTenantDb();
+  const estimate = await db.estimate.findFirst({ where: { id: estimateId } });
+  if (!estimate) throw new Error("Estimate not found");
+  await assertEstimateStatusChangeAllowed(estimate);
+
+  const total = await db.estimate.count({ where: { leadId: estimate.leadId } });
+  if (total <= 1) throw new Error("A lead must have at least one quotation");
+
+  await db.estimate.delete({ where: { id: estimateId } });
+  revalidatePath(`/admin/leads/${estimate.leadId}`);
 }
 
 export async function getEstimate(estimateId: string) {

@@ -11,7 +11,7 @@ import { amountInWords } from "@/lib/amountInWords";
 
 export type EstimateBuilderRow = { description: string; spec: string; qty: number; rate: number };
 
-const DEFAULT_ROWS: EstimateBuilderRow[] = [
+export const DEFAULT_ROWS: EstimateBuilderRow[] = [
   { description: "Solar PV Module", spec: "", qty: 1, rate: 0 },
   { description: "Solar Inverter", spec: "", qty: 1, rate: 0 },
   { description: "Solar Mounting Structure", spec: "Hot Dip Galvanized / Aluminium Structure", qty: 1, rate: 0 },
@@ -48,6 +48,7 @@ export function EstimateBuilderWithPreview({
   initialGstPercent = 5,
   initialSubsidyEstimate,
   initialNotes,
+  locked = false,
 }: {
   customerName: string;
   phone: string;
@@ -65,6 +66,7 @@ export function EstimateBuilderWithPreview({
   initialGstPercent?: number;
   initialSubsidyEstimate?: number;
   initialNotes: string;
+  locked?: boolean;
 }) {
   const [capacity, setCapacity] = useState(initialCapacity ? String(initialCapacity) : "");
   const [brand, setBrand] = useState<SolarBrandValue | "">(initialBrand ?? "");
@@ -134,7 +136,7 @@ export function EstimateBuilderWithPreview({
 
   return (
     <div>
-      <div className="space-y-4">
+      <fieldset disabled={locked} className="space-y-4 disabled:opacity-60">
         <div className="space-y-2">
           <Label htmlFor="systemSizeKw">System size (kW)</Label>
           <Input
@@ -282,7 +284,9 @@ export function EstimateBuilderWithPreview({
           <Label htmlFor="notes">Terms &amp; conditions</Label>
           <Textarea id="notes" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={8} />
         </div>
+      </fieldset>
 
+      <div className="mt-4">
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
           <DialogTrigger asChild>
             <Button type="button" variant="outline" size="sm">
@@ -404,3 +408,4 @@ export function EstimateBuilderWithPreview({
     </div>
   );
 }
+

@@ -50,16 +50,21 @@ export function computeConnectionStage(input: StageInput): ConnectionStageKey {
   return "sitevisit";
 }
 
-/** The estimate can be revised any time up through Site Visit/Documents, but
- * freezes once the job has genuinely entered Subsidy/Loan processing. */
+/** A quotation is locked (read-only) if: its own status is LOCKED, or it
+ * isn't the lead's final quotation (a non-final quote is always kept only
+ * as a read-only reference once another has been finalized), or it IS the
+ * final quotation and the job has genuinely entered Subsidy/Loan
+ * processing or later — editable any time before that, even once Approved. */
 export function isEstimateLocked(input: {
-  financingMethod: string;
-  subsidyStatus: string;
-  loanApplicationsCount: number;
+  status: string;
+  isCurrent: boolean;
+  hasOtherFinalEstimate: boolean;
+  connectionStage: ConnectionStageKey | null;
 }): boolean {
-  return (
-    input.financingMethod !== "NOT_SELECTED" ||
-    input.subsidyStatus !== "NOT_APPLIED" ||
-    input.loanApplicationsCount > 0
-  );
+  if (input.status === "LOCKED") return true;
+  if (!input.isCurrent) return input.hasOtherFinalEstimate;
+  if (input.isCurrent && input.connectionStage !== null) {
+    return STAGE_ORDER.indexOf(input.connectionStage) >= STAGE_ORDER.indexOf("subsidyloan");
+  }
+  return false;
 }

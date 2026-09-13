@@ -115,6 +115,7 @@ enum EstimateStatus {
   SENT
   ACCEPTED
   REJECTED
+  LOCKED
 }
 
 enum SolarBrand {
