@@ -239,6 +239,35 @@ export function EstimateBuilderWithPreview({
           </div>
         </div>
 
+        <table className="ml-auto w-full max-w-xs border-collapse text-sm">
+          <tbody>
+            <tr>
+              <td className="border p-1.5 text-muted-foreground">Subtotal</td>
+              <td className="border p-1.5 text-right font-mono">₹{money(subtotal)}</td>
+            </tr>
+            <tr>
+              <td className="border p-1.5 text-muted-foreground">GST ({gstPercent || 0}%)</td>
+              <td className="border p-1.5 text-right font-mono">₹{money(gstAmount)}</td>
+            </tr>
+            <tr className="bg-muted font-semibold">
+              <td className="border p-1.5">Grand total</td>
+              <td className="border p-1.5 text-right font-mono">₹{money(grandTotal)}</td>
+            </tr>
+            {subsidyValue > 0 && (
+              <>
+                <tr>
+                  <td className="border p-1.5 text-muted-foreground">Est. subsidy</td>
+                  <td className="border p-1.5 text-right font-mono">− ₹{money(subsidyValue)}</td>
+                </tr>
+                <tr className="font-semibold">
+                  <td className="border p-1.5">Net payable</td>
+                  <td className="border p-1.5 text-right font-mono">₹{money(netPayable)}</td>
+                </tr>
+              </>
+            )}
+          </tbody>
+        </table>
+
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="gstPercent">GST (%)</Label>
