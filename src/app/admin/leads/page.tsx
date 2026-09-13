@@ -128,21 +128,12 @@ export default async function LeadsPage() {
               </TableCell>
               <TableCell>{lead.estimatedValue?.toString() ?? "—"}</TableCell>
               <TableCell>
-                {lead.connection ? (
-                  <Link
-                    href={`/admin/connections/${lead.connection.id}`}
-                    className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
-                  >
-                    View customer →
-                  </Link>
-                ) : (
-                  <Link
-                    href={`/admin/leads/${lead.id}`}
-                    className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
-                  >
-                    Open estimate →
-                  </Link>
-                )}
+                <Link
+                  href={lead.connection ? `/admin/connections/${lead.connection.id}` : `/admin/leads/${lead.id}`}
+                  className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                >
+                  View →
+                </Link>
               </TableCell>
             </TableRow>
           ))}
