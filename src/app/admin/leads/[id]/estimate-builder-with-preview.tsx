@@ -150,6 +150,10 @@ export function EstimateBuilderWithPreview({
         </div>
 
         <input type="hidden" name="brand" value={brand} />
+        {/* Rows can grow past any fixed guess via "+ Add item" — tell the
+            server exactly how many item_N_* fields to read instead of
+            silently truncating past a hardcoded count. */}
+        <input type="hidden" name="itemCount" value={rows.length} />
 
         <div className="space-y-2">
           <p className="text-sm font-semibold">Select Solar Brand</p>

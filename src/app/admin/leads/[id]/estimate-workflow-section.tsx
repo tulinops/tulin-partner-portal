@@ -28,7 +28,9 @@ import {
 type LeadWithEstimates = NonNullable<Awaited<ReturnType<typeof getLead>>>;
 export type EstimateRecord = LeadWithEstimates["estimates"][number];
 
-const ESTIMATE_LINE_ITEM_ROW_COUNT = 20;
+// Fallback only — the form always sends the real row count via a hidden
+// "itemCount" field, since "+ Add item" can push rows past any fixed guess.
+const ESTIMATE_LINE_ITEM_ROW_COUNT_FALLBACK = 20;
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
@@ -44,8 +46,9 @@ function defaultValidUntil() {
 }
 
 function parseLineItemsFromForm(formData: FormData): EstimateLineItem[] {
+  const rowCount = Number(formData.get("itemCount")) || ESTIMATE_LINE_ITEM_ROW_COUNT_FALLBACK;
   const lineItems: EstimateLineItem[] = [];
-  for (let i = 0; i < ESTIMATE_LINE_ITEM_ROW_COUNT; i++) {
+  for (let i = 0; i < rowCount; i++) {
     const description = String(formData.get(`item_${i}_description`) || "");
     if (!description.trim()) continue;
     lineItems.push({
