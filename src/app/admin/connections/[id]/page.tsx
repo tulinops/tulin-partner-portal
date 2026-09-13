@@ -28,8 +28,8 @@ import { listStaffMembers } from "@/server/staff";
 import { addLeadNote, createEstimate, type EstimateLineItem } from "@/server/leads";
 import { SitePhotos } from "./site-photos";
 import { CustomerTabs } from "./customer-tabs";
-import { EstimateItemsBuilder } from "@/app/admin/leads/[id]/estimate-items-builder";
-import { SOLAR_BRANDS, type SolarBrandValue, type BrandLineItem } from "@/lib/estimateBrands";
+import { EstimateItemsBuilder, type EstimateBuilderRow } from "@/app/admin/leads/[id]/estimate-items-builder";
+import { SOLAR_BRANDS, type SolarBrandValue } from "@/lib/estimateBrands";
 import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
 import { STAGE_LABELS } from "@/lib/connectionStage";
 import type {
@@ -539,7 +539,7 @@ export default async function ConnectionDetailPage({
   );
 
   const currentEstimateLineItems = (currentEstimate?.lineItems as unknown as EstimateLineItem[] | undefined) ?? [];
-  const builderInitialRows: BrandLineItem[] | undefined = currentEstimate
+  const builderInitialRows: EstimateBuilderRow[] | undefined = currentEstimate
     ? currentEstimateLineItems.map((item) => ({
         description: item.description,
         spec: item.spec ?? "",
@@ -635,18 +635,9 @@ export default async function ConnectionDetailPage({
               initialCapacity={currentEstimate?.systemSizeKw ? Number(currentEstimate.systemSizeKw) : undefined}
               initialBrand={(currentEstimate?.brand as SolarBrandValue | undefined) ?? undefined}
               initialRows={builderInitialRows}
+              initialGstPercent={currentEstimate ? Number(currentEstimate.gstPercent) : 5}
             />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="gstPercent">GST (%)</Label>
-                <Input
-                  id="gstPercent"
-                  name="gstPercent"
-                  type="number"
-                  step="0.01"
-                  defaultValue={currentEstimate ? Number(currentEstimate.gstPercent) : 5}
-                />
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="subsidyEstimate">Est. government subsidy (₹)</Label>
                 <Input

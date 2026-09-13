@@ -220,11 +220,7 @@ export default async function LeadDetailPage({
 
             <EstimateItemsBuilder />
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="gstPercent">GST (%)</Label>
-                <Input id="gstPercent" name="gstPercent" type="number" step="0.01" defaultValue="5" />
-              </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="subsidyEstimate">Est. government subsidy (₹)</Label>
                 <Input id="subsidyEstimate" name="subsidyEstimate" type="number" step="0.01" />
