@@ -526,9 +526,13 @@ export default async function ConnectionDetailPage({
           <form action={siteVisitAssignmentAction} className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="staffMemberId">Worker</Label>
-              <Select name="staffMemberId" defaultValue={connection.staffMemberId ?? undefined}>
+              <Select
+                name="staffMemberId"
+                defaultValue={connection.staffMemberId ?? undefined}
+                disabled={staff.length === 0}
+              >
                 <SelectTrigger id="staffMemberId">
-                  <SelectValue placeholder="Select a worker" />
+                  <SelectValue placeholder={staff.length === 0 ? "No workers added yet" : "Select a worker"} />
                 </SelectTrigger>
                 <SelectContent>
                   {staff.map((s) => (
@@ -539,6 +543,15 @@ export default async function ConnectionDetailPage({
                   ))}
                 </SelectContent>
               </Select>
+              {staff.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No workers yet —{" "}
+                  <Link href="/admin/staff" className="underline underline-offset-4">
+                    add one from Staff
+                  </Link>
+                  .
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="siteVisitStatus">Status</Label>
