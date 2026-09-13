@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { SOLAR_BRANDS, buildBrandLineItems, brandLabel, type SolarBrandValue } from "@/lib/estimateBrands";
 import { amountInWords } from "@/lib/amountInWords";
 
@@ -132,8 +133,8 @@ export function EstimateBuilderWithPreview({
   const netPayable = grandTotal - subsidyValue;
 
   return (
-    <div className={showPreview ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]" : ""}>
-      <div className="min-w-0 space-y-4">
+    <div>
+      <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="systemSizeKw">System size (kW)</Label>
           <Input
@@ -282,18 +283,18 @@ export function EstimateBuilderWithPreview({
           <Textarea id="notes" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={8} />
         </div>
 
-        <Button type="button" variant="outline" size="sm" onClick={() => setShowPreview((v) => !v)}>
-          {showPreview ? "Hide preview" : "Preview estimate"}
-        </Button>
-      </div>
-
-      {showPreview && (
-      <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
-        <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Live preview</p>
-        <div
-          className="min-w-0 space-y-3 overflow-hidden rounded-md border bg-white p-4 text-[#1c1c1c] shadow-sm"
-          style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
-        >
+        <Dialog open={showPreview} onOpenChange={setShowPreview}>
+          <DialogTrigger asChild>
+            <Button type="button" variant="outline" size="sm">
+              Preview estimate
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+            <DialogTitle>Live preview</DialogTitle>
+            <div
+              className="min-w-0 space-y-3 rounded-md border bg-white p-4 text-[#1c1c1c] shadow-sm"
+              style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
+            >
           <div className="border-b-[3px] border-[#16823b] pb-2 text-center">
             <p className="text-sm font-extrabold tracking-wide text-balance text-[#08752f] uppercase">
               {tenantName}
@@ -396,9 +397,10 @@ export function EstimateBuilderWithPreview({
             <strong>Amount in Words: </strong>
             {amountInWords(grandTotal)}
           </p>
-        </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
-      )}
     </div>
   );
 }
