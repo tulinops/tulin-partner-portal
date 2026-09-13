@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { requireSuperAdmin } from "@/lib/permissions";
 import { forSuperAdminUnscoped } from "@/lib/db";
+import { DEFAULT_REQUIRED_DOCUMENT_TYPES } from "@/lib/requiredDocumentDefaults";
 import type { BusinessType } from "@/generated/prisma/enums";
 
 function randomTempPassword() {
@@ -53,6 +54,9 @@ export async function createTenant(input: {
           passwordHash,
           mustChangePassword: true,
         },
+      },
+      requiredDocumentTypes: {
+        create: DEFAULT_REQUIRED_DOCUMENT_TYPES.map((t, i) => ({ name: t.name, displayOrder: i })),
       },
     },
   });

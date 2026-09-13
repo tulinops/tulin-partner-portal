@@ -2,6 +2,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { DEFAULT_REQUIRED_DOCUMENT_TYPES } from "../src/lib/requiredDocumentDefaults";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -47,6 +48,13 @@ async function main() {
       },
     },
   });
+
+  const existingDocTypes = await prisma.requiredDocumentType.count({ where: { tenantId: tenant.id } });
+  if (existingDocTypes === 0) {
+    await prisma.requiredDocumentType.createMany({
+      data: DEFAULT_REQUIRED_DOCUMENT_TYPES.map((t, i) => ({ tenantId: tenant.id, name: t.name, displayOrder: i })),
+    });
+  }
 
   const existingLeads = await prisma.lead.count({ where: { tenantId: tenant.id } });
   if (existingLeads === 0) {
