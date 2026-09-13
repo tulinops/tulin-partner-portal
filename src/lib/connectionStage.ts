@@ -50,11 +50,13 @@ export function computeConnectionStage(input: StageInput): ConnectionStageKey {
   return "sitevisit";
 }
 
-/** A quotation is locked (read-only) if: its own status is LOCKED, or it
- * isn't the lead's final quotation (a non-final quote is always kept only
- * as a read-only reference once another has been finalized), or it IS the
- * final quotation and the job has genuinely entered Subsidy/Loan
- * processing or later — editable any time before that, even once Approved. */
+/** A quotation is locked (read-only) if: its own status is LOCKED, or it's a
+ * non-final quote that was actually sent to the customer while another quote
+ * has since been finalized (kept only as read-only history — a fresh/unsent
+ * Draft stays editable regardless, since that's exactly how a new comparison
+ * quote is built), or it IS the final quotation and the job has genuinely
+ * entered Subsidy/Loan processing or later — editable any time before that,
+ * even once Approved. */
 export function isEstimateLocked(input: {
   status: string;
   isCurrent: boolean;
@@ -62,7 +64,10 @@ export function isEstimateLocked(input: {
   connectionStage: ConnectionStageKey | null;
 }): boolean {
   if (input.status === "LOCKED") return true;
-  if (!input.isCurrent) return input.hasOtherFinalEstimate;
+  if (!input.isCurrent) {
+    if (input.status === "DRAFT") return false;
+    return input.hasOtherFinalEstimate;
+  }
   if (input.isCurrent && input.connectionStage !== null) {
     return STAGE_ORDER.indexOf(input.connectionStage) >= STAGE_ORDER.indexOf("subsidyloan");
   }
