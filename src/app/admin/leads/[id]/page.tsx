@@ -4,7 +4,6 @@ import {
   getLead,
   moveLeadStage,
   addLeadNote,
-  convertLeadToConnection,
   updateLeadDetails,
   createEstimate,
   type EstimateLineItem,
@@ -44,8 +43,6 @@ export default async function LeadDetailPage({
   const lead = await getLead(id);
   if (!lead) notFound();
 
-  const currentEstimate = lead.estimates.find((e) => e.isCurrent);
-
   async function moveStageAction(formData: FormData) {
     "use server";
     await moveLeadStage(id, formData.get("stage") as (typeof STAGES)[number]);
@@ -58,16 +55,6 @@ export default async function LeadDetailPage({
       leadId: id,
       body: String(formData.get("body")),
       followUpAt: followUpAt ? new Date(String(followUpAt)) : undefined,
-    });
-  }
-
-  async function convertAction(formData: FormData) {
-    "use server";
-    const systemSizeKw = formData.get("systemSizeKw");
-    await convertLeadToConnection({
-      leadId: id,
-      address: String(formData.get("address") || ""),
-      systemSizeKw: systemSizeKw ? Number(systemSizeKw) : undefined,
     });
   }
 
@@ -258,42 +245,15 @@ export default async function LeadDetailPage({
         </CardContent>
       </Card>
 
-      {lead.connection ? (
+      {lead.connection && (
         <Card>
           <CardHeader>
-            <CardTitle>Converted to Connection</CardTitle>
+            <CardTitle>Customer</CardTitle>
           </CardHeader>
           <CardContent>
             <a href={`/admin/connections/${lead.connection.id}`} className="underline underline-offset-4">
-              View connection →
+              View customer →
             </a>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Convert to Connection</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={convertAction} className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor="address">Site address</Label>
-                <Input id="address" name="address" defaultValue={lead.address ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="systemSizeKw">System size (kW)</Label>
-                <Input
-                  id="systemSizeKw"
-                  name="systemSizeKw"
-                  type="number"
-                  step="0.1"
-                  defaultValue={currentEstimate?.systemSizeKw?.toString() ?? ""}
-                />
-              </div>
-              <div className="sm:col-span-3">
-                <Button type="submit">Convert to installation</Button>
-              </div>
-            </form>
           </CardContent>
         </Card>
       )}

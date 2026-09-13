@@ -65,7 +65,39 @@ export async function updateLeadDetails(input: {
 }
 
 export async function moveLeadStage(leadId: string, stage: LeadStage) {
-  const { db } = await getTenantDb();
+  const { db, tenantId } = await getTenantDb();
+
+  if (stage === "WON") {
+    const lead = await db.lead.findFirst({
+      where: { id: leadId },
+      include: { connection: true, estimates: { where: { isCurrent: true }, take: 1 } },
+    });
+    if (!lead) throw new Error("Lead not found");
+
+    // Moving a lead to Won is what starts the customer journey — create the
+    // Connection automatically here instead of a separate manual step, using
+    // whatever address/system size the lead and its current estimate already have.
+    if (!lead.connection) {
+      await db.$transaction(async (tx) => {
+        await tx.lead.update({ where: { id: lead.id }, data: { stage: "WON" } });
+        await tx.connection.create({
+          data: {
+            tenantId,
+            leadId: lead.id,
+            customerName: lead.customerName,
+            phone: lead.phone,
+            address: lead.address ?? undefined,
+            systemSizeKw: lead.estimates[0]?.systemSizeKw ?? undefined,
+          },
+        });
+      });
+      revalidatePath("/admin/leads");
+      revalidatePath(`/admin/leads/${leadId}`);
+      revalidatePath("/admin/connections");
+      return;
+    }
+  }
+
   await db.lead.update({ where: { id: leadId }, data: { stage } });
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);
@@ -194,31 +226,4 @@ export async function getEstimate(estimateId: string) {
     where: { id: estimateId },
     include: { lead: true, tenant: true },
   });
-}
-
-export async function convertLeadToConnection(input: {
-  leadId: string;
-  address?: string;
-  systemSizeKw?: number;
-}) {
-  const { db, tenantId } = await getTenantDb();
-  const lead = await db.lead.findFirst({ where: { id: input.leadId } });
-  if (!lead) throw new Error("Lead not found");
-
-  await db.$transaction(async (tx) => {
-    await tx.lead.update({ where: { id: lead.id }, data: { stage: "WON" } });
-    await tx.connection.create({
-      data: {
-        tenantId,
-        leadId: lead.id,
-        customerName: lead.customerName,
-        phone: lead.phone,
-        address: input.address,
-        systemSizeKw: input.systemSizeKw,
-      },
-    });
-  });
-
-  revalidatePath("/admin/leads");
-  revalidatePath("/admin/connections");
 }
