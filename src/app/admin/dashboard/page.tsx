@@ -16,14 +16,22 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <h1 className="font-heading text-2xl font-extrabold">Dashboard</h1>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-              Total invested (inventory)
+              New leads (30d)
             </CardTitle>
           </CardHeader>
-          <CardContent className="font-mono text-2xl font-bold">{formatMoney(totals.totalInvested)}</CardContent>
+          <CardContent className="font-mono text-2xl font-bold">{totals.newLeadsLast30Days}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              Active connections
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="font-mono text-2xl font-bold">{totals.activeConnections}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
@@ -70,23 +78,45 @@ export default async function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Stock levels</CardTitle>
+            <CardTitle>Recent activity</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            {totals.stockLevels.length === 0 && (
-              <p className="text-sm text-muted-foreground">No inventory items yet.</p>
+          <CardContent className="space-y-3">
+            {totals.activity.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nothing yet.</p>
             )}
-            {totals.stockLevels.map((item) => (
-              <div key={item.id} className="flex justify-between text-sm">
-                <span>{item.name}</span>
-                <span className="font-mono font-medium">
-                  {item.runningStock.toString()} {item.unit}
-                </span>
+            {totals.activity.map((item, i) => (
+              <div key={i} className="flex gap-2.5 border-b border-border pb-3 last:border-0 last:pb-0">
+                <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
+                <div className="text-sm">
+                  <p>
+                    <span className="font-semibold">{item.headline}</span> — {item.detail}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{item.at.toLocaleString("en-IN")}</p>
+                </div>
               </div>
             ))}
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Stock levels</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {totals.stockLevels.length === 0 && (
+            <p className="text-sm text-muted-foreground">No inventory items yet.</p>
+          )}
+          {totals.stockLevels.map((item) => (
+            <div key={item.id} className="flex justify-between text-sm">
+              <span>{item.name}</span>
+              <span className="font-mono font-medium">
+                {item.runningStock.toString()} {item.unit}
+              </span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }
