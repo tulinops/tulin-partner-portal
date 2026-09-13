@@ -62,16 +62,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const STATUSES = [
-  "SITE_INSPECTION_PENDING",
-  "SITE_INSPECTION_DONE",
-  "SUBSIDY_APPLIED",
-  "SUBSIDY_APPROVED",
-  "INSTALLATION_IN_PROGRESS",
-  "COMPLETED",
-  "CANCELLED",
-] as const;
-
 const SUBSIDY_STATUSES = ["NOT_APPLIED", "APPLIED", "APPROVED", "REJECTED", "DISBURSED"] as const;
 
 const SITE_VISIT_STATUSES = [
@@ -194,11 +184,14 @@ export default async function ConnectionDetailPage({
     });
   }
 
-  async function updateStatusAction(formData: FormData) {
+  // Status only ever advances as a byproduct of real progress on the Site
+  // Visit / Subsidy-Loan / Installation tabs (see updateConnectionStatus's
+  // callers) — Overview can change who's assigned, not jump the stage.
+  async function updateInstallerAction(formData: FormData) {
     "use server";
     await updateConnectionStatus({
       connectionId: id,
-      status: formData.get("status") as (typeof STATUSES)[number],
+      status: connection.status,
       assignedInstaller: String(formData.get("assignedInstaller") || "") || undefined,
     });
   }
@@ -424,22 +417,16 @@ export default async function ConnectionDetailPage({
           <CardTitle>Status &amp; installer</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={updateStatusAction} className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select name="status" defaultValue={connection.status}>
-                <SelectTrigger id="status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="mb-4 space-y-1">
+            <p className="text-sm text-muted-foreground">Status</p>
+            <p className="text-sm font-medium">
+              {connection.status.replace(/_/g, " ")}
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                (advances automatically from the Site Visit / Subsidy-Loan / Installation tabs)
+              </span>
+            </p>
+          </div>
+          <form action={updateInstallerAction} className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="assignedInstaller">Assigned installer</Label>
               <Input
