@@ -132,8 +132,8 @@ export function EstimateBuilderWithPreview({
   const netPayable = grandTotal - subsidyValue;
 
   return (
-    <div className={showPreview ? "grid gap-6 lg:grid-cols-[1fr_380px]" : ""}>
-      <div className="space-y-4">
+    <div className={showPreview ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]" : ""}>
+      <div className="min-w-0 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="systemSizeKw">System size (kW)</Label>
           <Input
@@ -288,16 +288,18 @@ export function EstimateBuilderWithPreview({
       </div>
 
       {showPreview && (
-      <div className="lg:sticky lg:top-4 lg:self-start">
+      <div className="min-w-0 lg:sticky lg:top-4 lg:self-start">
         <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Live preview</p>
         <div
-          className="space-y-3 rounded-md border bg-white p-4 text-[#1c1c1c] shadow-sm"
+          className="min-w-0 space-y-3 overflow-hidden rounded-md border bg-white p-4 text-[#1c1c1c] shadow-sm"
           style={{ fontFamily: "Arial, Helvetica, sans-serif" }}
         >
           <div className="border-b-[3px] border-[#16823b] pb-2 text-center">
-            <p className="text-base font-extrabold tracking-wide text-[#08752f] uppercase">{tenantName}</p>
-            {tenantAddress && <p className="mt-0.5 text-[10px]">{tenantAddress}</p>}
-            <p className="mt-0.5 text-[10px] font-bold">
+            <p className="text-sm font-extrabold tracking-wide text-balance text-[#08752f] uppercase">
+              {tenantName}
+            </p>
+            {tenantAddress && <p className="mt-0.5 text-[10px] break-words">{tenantAddress}</p>}
+            <p className="mt-0.5 text-[10px] font-bold break-words">
               {tenantGstin && <span className="text-[#b00000]">GST: {tenantGstin}</span>}
               {tenantGstin && (tenantPhone || tenantEmail) ? " | " : ""}
               {tenantPhone}
@@ -334,12 +336,12 @@ export function EstimateBuilderWithPreview({
             Selected Brand: {brandLabel(brand) ?? "Not selected"}
           </p>
 
-          <table className="w-full border-collapse text-[10px]">
+          <table className="w-full table-fixed border-collapse text-[10px]">
             <thead>
               <tr className="bg-[#16823b] text-white">
                 <th className="border border-[#0c5b29] p-1 text-left">Description</th>
-                <th className="border border-[#0c5b29] p-1 text-right">Qty</th>
-                <th className="border border-[#0c5b29] p-1 text-right">Amount</th>
+                <th className="w-10 border border-[#0c5b29] p-1 text-right">Qty</th>
+                <th className="w-16 border border-[#0c5b29] p-1 text-right">Amount</th>
               </tr>
             </thead>
             <tbody>
@@ -352,20 +354,20 @@ export function EstimateBuilderWithPreview({
               ) : (
                 visibleRows.map((r, i) => (
                   <tr key={i}>
-                    <td className="border border-[#999] p-1">{r.description}</td>
+                    <td className="border border-[#999] p-1 break-words">{r.description}</td>
                     <td className="border border-[#999] p-1 text-right">{r.qty}</td>
-                    <td className="border border-[#999] p-1 text-right">{money(r.qty * r.rate)}</td>
+                    <td className="border border-[#999] p-1 text-right break-words">{money(r.qty * r.rate)}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
 
-          <table className="w-full border-collapse text-[10px]">
+          <table className="w-full table-fixed border-collapse text-[10px]">
             <tbody>
               <tr>
                 <td className="border border-[#999] bg-[#f2f7f3] p-1 font-semibold">Subtotal</td>
-                <td className="border border-[#999] p-1 text-right">₹{money(subtotal)}</td>
+                <td className="border border-[#999] p-1 text-right break-words">₹{money(subtotal)}</td>
               </tr>
               <tr>
                 <td className="border border-[#999] bg-[#f2f7f3] p-1 font-semibold">GST ({gstPercent || 0}%)</td>
