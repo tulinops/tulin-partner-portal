@@ -21,10 +21,18 @@ const INACTIVE_BRAND_BTN =
 const ACTIVE_BRAND_BTN =
   "rounded-md border-2 border-[#16823b] bg-[#16823b] px-4 py-2 text-sm font-bold text-white";
 
-export function EstimateItemsBuilder() {
-  const [capacity, setCapacity] = useState("");
-  const [brand, setBrand] = useState<SolarBrandValue | "">("");
-  const [rows, setRows] = useState<BrandLineItem[]>(DEFAULT_ROWS);
+export function EstimateItemsBuilder({
+  initialCapacity,
+  initialBrand,
+  initialRows,
+}: {
+  initialCapacity?: number;
+  initialBrand?: SolarBrandValue;
+  initialRows?: BrandLineItem[];
+} = {}) {
+  const [capacity, setCapacity] = useState(initialCapacity ? String(initialCapacity) : "");
+  const [brand, setBrand] = useState<SolarBrandValue | "">(initialBrand ?? "");
+  const [rows, setRows] = useState<BrandLineItem[]>(initialRows ?? DEFAULT_ROWS);
 
   const capacityValue = parseFloat(capacity);
   const capacityValid = !Number.isNaN(capacityValue) && capacityValue > 0;
@@ -112,10 +120,24 @@ export function EstimateItemsBuilder() {
                   />
                 </td>
                 <td className="border p-1">
-                  <Input name={`item_${i}_qty`} type="number" step="0.01" className="w-20" />
+                  <Input
+                    key={`qty-${i}-${row.qty ?? ""}`}
+                    name={`item_${i}_qty`}
+                    type="number"
+                    step="0.01"
+                    className="w-20"
+                    defaultValue={row.qty || ""}
+                  />
                 </td>
                 <td className="border p-1">
-                  <Input name={`item_${i}_rate`} type="number" step="0.01" className="w-28" />
+                  <Input
+                    key={`rate-${i}-${row.rate ?? ""}`}
+                    name={`item_${i}_rate`}
+                    type="number"
+                    step="0.01"
+                    className="w-28"
+                    defaultValue={row.rate || ""}
+                  />
                 </td>
               </tr>
             ))}

@@ -13,7 +13,7 @@ export function brandLabel(value: string | null | undefined): string | null {
   return SOLAR_BRANDS.find((b) => b.value === value)?.label ?? null;
 }
 
-export type BrandLineItem = { description: string; spec: string };
+export type BrandLineItem = { description: string; spec: string; qty?: number; rate?: number };
 
 // Line-for-line port of quotation.html's loadBrandItems() templates.
 export function buildBrandLineItems(brandLabelText: string, capacityKw: number): BrandLineItem[] {

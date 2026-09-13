@@ -25,9 +25,12 @@ import {
 } from "@/server/documents";
 import { listInventoryItems, allocateToConnection } from "@/server/inventory";
 import { listStaffMembers } from "@/server/staff";
-import { addLeadNote } from "@/server/leads";
+import { addLeadNote, createEstimate, type EstimateLineItem } from "@/server/leads";
 import { SitePhotos } from "./site-photos";
 import { CustomerTabs } from "./customer-tabs";
+import { EstimateItemsBuilder } from "@/app/admin/leads/[id]/estimate-items-builder";
+import { SOLAR_BRANDS, type SolarBrandValue, type BrandLineItem } from "@/lib/estimateBrands";
+import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
 import { STAGE_LABELS } from "@/lib/connectionStage";
 import type {
   SiteVisitStatus,
@@ -144,6 +147,12 @@ function dateInputValue(d: Date | null | undefined) {
   return d ? d.toISOString().slice(0, 10) : "";
 }
 
+function defaultValidUntil() {
+  return new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+const ESTIMATE_LINE_ITEM_ROW_COUNT = 8;
+
 export default async function ConnectionDetailPage({
   params,
 }: {
@@ -171,6 +180,40 @@ export default async function ConnectionDetailPage({
   const staff = await listStaffMembers();
   const inspection = siteInspectionDetails ?? ({} as SiteInspectionDetails);
   const currentEstimate = connection.lead.estimates.find((e) => e.isCurrent);
+
+  async function createEstimateAction(formData: FormData) {
+    "use server";
+    const lineItems: EstimateLineItem[] = [];
+    for (let i = 0; i < ESTIMATE_LINE_ITEM_ROW_COUNT; i++) {
+      const description = String(formData.get(`item_${i}_description`) || "");
+      if (!description.trim()) continue;
+      lineItems.push({
+        description,
+        spec: String(formData.get(`item_${i}_spec`) || ""),
+        qty: Number(formData.get(`item_${i}_qty`) || 0),
+        rate: Number(formData.get(`item_${i}_rate`) || 0),
+        amount: 0, // recomputed server-side in createEstimate
+      });
+    }
+
+    const systemSizeKw = formData.get("systemSizeKw");
+    const gstPercent = formData.get("gstPercent");
+    const subsidyEstimate = formData.get("subsidyEstimate");
+    const validUntil = formData.get("validUntil");
+    const rawBrand = String(formData.get("brand") || "");
+    const brand = SOLAR_BRANDS.some((b) => b.value === rawBrand) ? (rawBrand as SolarBrandValue) : undefined;
+
+    await createEstimate({
+      leadId: connection.leadId,
+      systemSizeKw: systemSizeKw ? Number(systemSizeKw) : undefined,
+      brand,
+      lineItems,
+      gstPercent: gstPercent ? Number(gstPercent) : undefined,
+      subsidyEstimate: subsidyEstimate ? Number(subsidyEstimate) : undefined,
+      validUntil: validUntil ? new Date(String(validUntil)) : undefined,
+      notes: String(formData.get("notes") || "") || undefined,
+    });
+  }
 
   async function allocateAction(formData: FormData) {
     "use server";
@@ -495,6 +538,16 @@ export default async function ConnectionDetailPage({
     </Card>
   );
 
+  const currentEstimateLineItems = (currentEstimate?.lineItems as unknown as EstimateLineItem[] | undefined) ?? [];
+  const builderInitialRows: BrandLineItem[] | undefined = currentEstimate
+    ? currentEstimateLineItems.map((item) => ({
+        description: item.description,
+        spec: item.spec ?? "",
+        qty: item.qty,
+        rate: item.rate,
+      }))
+    : undefined;
+
   const estimateSection = (
     <Card>
       <CardHeader>
@@ -507,32 +560,59 @@ export default async function ConnectionDetailPage({
         {estimateLocked && (
           <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
             This estimate is locked — the job has moved into Subsidy / Loan processing. Pricing can no longer
-            change here; create a new revision from the Leads section if it must.
+            change in place; create a new revision below if it must.
           </p>
         )}
         {currentEstimate ? (
-          <div className="space-y-1 text-sm">
-            <p>
-              <span className="text-muted-foreground">Estimate no.</span>{" "}
-              <span className="font-mono">{currentEstimate.estimateNumber}</span> (v{currentEstimate.version})
-            </p>
-            <p>
-              <span className="text-muted-foreground">System size / brand</span>{" "}
-              {currentEstimate.systemSizeKw ? `${currentEstimate.systemSizeKw} kW` : "—"}
-              {currentEstimate.brand ? ` · ${currentEstimate.brand}` : ""}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Grand total</span>{" "}
-              <span className="font-mono">{money(Number(currentEstimate.totalAmount))}</span>
-            </p>
-            <p>
-              <span className="text-muted-foreground">Est. subsidy</span>{" "}
-              {currentEstimate.subsidyEstimate ? money(Number(currentEstimate.subsidyEstimate)) : "—"}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Status</span> {currentEstimate.status}
-            </p>
-          </div>
+          <>
+            <div className="grid gap-1 text-sm sm:grid-cols-2">
+              <p>
+                <span className="text-muted-foreground">Estimate no.</span>{" "}
+                <span className="font-mono">{currentEstimate.estimateNumber}</span> (v{currentEstimate.version})
+              </p>
+              <p>
+                <span className="text-muted-foreground">System size / brand</span>{" "}
+                {currentEstimate.systemSizeKw ? `${currentEstimate.systemSizeKw} kW` : "—"}
+                {currentEstimate.brand ? ` · ${currentEstimate.brand}` : ""}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Grand total</span>{" "}
+                <span className="font-mono">{money(Number(currentEstimate.totalAmount))}</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Est. subsidy</span>{" "}
+                {currentEstimate.subsidyEstimate ? money(Number(currentEstimate.subsidyEstimate)) : "—"}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Status</span> {currentEstimate.status}
+              </p>
+            </div>
+
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full min-w-[560px] border-collapse text-sm">
+                <thead>
+                  <tr className="text-left text-muted-foreground">
+                    <th className="border-b p-2">Description</th>
+                    <th className="border-b p-2">Specification</th>
+                    <th className="border-b p-2 text-right">Qty</th>
+                    <th className="border-b p-2 text-right">Rate</th>
+                    <th className="border-b p-2 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentEstimateLineItems.map((item, i) => (
+                    <tr key={i}>
+                      <td className="border-b p-2">{item.description}</td>
+                      <td className="border-b p-2">{item.spec}</td>
+                      <td className="border-b p-2 text-right">{item.qty}</td>
+                      <td className="border-b p-2 text-right font-mono">{money(item.rate)}</td>
+                      <td className="border-b p-2 text-right font-mono">{money(item.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">No estimate found.</p>
         )}
@@ -544,14 +624,57 @@ export default async function ConnectionDetailPage({
               </Button>
             </Link>
           )}
-          {!estimateLocked && (
-            <Link href={`/admin/leads/${connection.leadId}`}>
-              <Button variant="outline" size="sm">
-                Edit / create revision →
-              </Button>
-            </Link>
-          )}
         </div>
+
+        <details className="rounded-md border p-4" open={!estimateLocked}>
+          <summary className="cursor-pointer text-sm font-semibold">
+            {estimateLocked ? "+ Create new revision" : "Edit estimate (saves as a new version)"}
+          </summary>
+          <form action={createEstimateAction} className="mt-4 space-y-4">
+            <EstimateItemsBuilder
+              initialCapacity={currentEstimate?.systemSizeKw ? Number(currentEstimate.systemSizeKw) : undefined}
+              initialBrand={(currentEstimate?.brand as SolarBrandValue | undefined) ?? undefined}
+              initialRows={builderInitialRows}
+            />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="gstPercent">GST (%)</Label>
+                <Input
+                  id="gstPercent"
+                  name="gstPercent"
+                  type="number"
+                  step="0.01"
+                  defaultValue={currentEstimate ? Number(currentEstimate.gstPercent) : 5}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subsidyEstimate">Est. government subsidy (₹)</Label>
+                <Input
+                  id="subsidyEstimate"
+                  name="subsidyEstimate"
+                  type="number"
+                  step="0.01"
+                  defaultValue={currentEstimate?.subsidyEstimate ? Number(currentEstimate.subsidyEstimate) : ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="validUntil">Valid until</Label>
+                <Input id="validUntil" name="validUntil" type="date" defaultValue={defaultValidUntil()} />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Terms &amp; conditions</Label>
+              <Textarea
+                id="notes"
+                name="notes"
+                defaultValue={currentEstimate?.notes ?? DEFAULT_ESTIMATE_TERMS}
+                rows={6}
+              />
+            </div>
+            <Button type="submit">{estimateLocked ? "Create revision" : "Save new version"}</Button>
+          </form>
+        </details>
+
         {connection.lead.estimates.length > 1 && (
           <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
             <p className="font-semibold text-foreground">History</p>
