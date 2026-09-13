@@ -23,9 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { EstimateItemsBuilder } from "./estimate-items-builder";
+import { EstimateBuilderWithPreview } from "./estimate-builder-with-preview";
 import { SOLAR_BRANDS, type SolarBrandValue } from "@/lib/estimateBrands";
 import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
+import { getBusinessProfile } from "@/server/business-profile";
 
 const STAGES = ["NEW", "CONTACTED", "SITE_VISIT", "QUOTED", "WON", "LOST"] as const;
 const LINE_ITEM_ROW_COUNT = 8;
@@ -42,6 +43,7 @@ export default async function LeadDetailPage({
   const { id } = await params;
   const lead = await getLead(id);
   if (!lead) notFound();
+  const tenant = await getBusinessProfile();
 
   async function moveStageAction(formData: FormData) {
     "use server";
@@ -218,23 +220,25 @@ export default async function LeadDetailPage({
           <form action={createEstimateAction} className="space-y-4">
             <h3 className="text-sm font-semibold">Create new estimate</h3>
 
-            <EstimateItemsBuilder />
+            {lead.requirementNotes && (
+              <p className="rounded-md border-l-2 border-primary bg-muted/50 p-3 text-sm text-muted-foreground italic">
+                &ldquo;{lead.requirementNotes}&rdquo;
+              </p>
+            )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="subsidyEstimate">Est. government subsidy (₹)</Label>
-                <Input id="subsidyEstimate" name="subsidyEstimate" type="number" step="0.01" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="validUntil">Valid until</Label>
-                <Input id="validUntil" name="validUntil" type="date" defaultValue={defaultValidUntil()} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Terms &amp; conditions</Label>
-              <Textarea id="notes" name="notes" defaultValue={DEFAULT_ESTIMATE_TERMS} rows={8} />
-            </div>
+            <EstimateBuilderWithPreview
+              customerName={lead.customerName}
+              phone={lead.phone}
+              email={lead.email}
+              address={lead.address}
+              tenantName={tenant?.name ?? "Your Business"}
+              tenantAddress={tenant?.businessAddress}
+              tenantGstin={tenant?.gstin}
+              tenantPhone={tenant?.contactPhone}
+              tenantEmail={tenant?.contactEmail}
+              defaultValidUntil={defaultValidUntil()}
+              initialNotes={DEFAULT_ESTIMATE_TERMS}
+            />
 
             <Button type="submit">Create estimate</Button>
           </form>
