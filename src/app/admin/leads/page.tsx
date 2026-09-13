@@ -107,6 +107,7 @@ export default async function LeadsPage() {
             <TableHead>Source</TableHead>
             <TableHead>Stage</TableHead>
             <TableHead>Est. value</TableHead>
+            <TableHead />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -126,11 +127,28 @@ export default async function LeadsPage() {
                 </Badge>
               </TableCell>
               <TableCell>{lead.estimatedValue?.toString() ?? "—"}</TableCell>
+              <TableCell>
+                {lead.connection ? (
+                  <Link
+                    href={`/admin/connections/${lead.connection.id}`}
+                    className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                  >
+                    View customer →
+                  </Link>
+                ) : (
+                  <Link
+                    href={`/admin/leads/${lead.id}`}
+                    className="text-sm font-semibold text-primary underline-offset-4 hover:underline"
+                  >
+                    Open estimate →
+                  </Link>
+                )}
+              </TableCell>
             </TableRow>
           ))}
           {leads.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
+              <TableCell colSpan={7} className="text-center text-muted-foreground">
                 No leads yet.
               </TableCell>
             </TableRow>
