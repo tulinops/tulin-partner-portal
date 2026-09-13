@@ -43,7 +43,7 @@ export default async function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Inventory</h1>
+      <h1 className="font-heading text-2xl font-extrabold">Inventory</h1>
 
       <Card>
         <CardHeader>

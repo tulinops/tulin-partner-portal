@@ -36,7 +36,7 @@ export default async function TenantsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Tenants</h1>
+      <h1 className="font-heading text-2xl font-extrabold">Tenants</h1>
       <p className="text-sm text-muted-foreground">
         Metadata only — tenant business data (leads, inventory, finance) is private to each tenant
         and never shown here.

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { listConnections } from "@/server/connections";
-import { Badge } from "@/components/ui/badge";
+import { ConnectionStatusBadge } from "@/components/status-badge";
 import {
   Table,
   TableBody,
@@ -15,7 +15,7 @@ export default async function ConnectionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Connections</h1>
+      <h1 className="font-heading text-2xl font-extrabold">Connections</h1>
       <p className="text-sm text-muted-foreground">
         Won leads convert into connections from the lead detail page.
       </p>
@@ -39,13 +39,11 @@ export default async function ConnectionsPage() {
                     {c.customerName}
                   </Link>
                 </TableCell>
-                <TableCell>{c.systemSizeKw ? `${c.systemSizeKw} kW` : "—"}</TableCell>
+                <TableCell className="font-mono">{c.systemSizeKw ? `${c.systemSizeKw} kW` : "—"}</TableCell>
                 <TableCell>
-                  <Badge variant={c.status === "COMPLETED" ? "default" : c.status === "CANCELLED" ? "destructive" : "secondary"}>
-                    {c.status.replace(/_/g, " ")}
-                  </Badge>
+                  <ConnectionStatusBadge status={c.status} />
                 </TableCell>
-                <TableCell>₹{collected.toLocaleString("en-IN")}</TableCell>
+                <TableCell className="font-mono">₹{collected.toLocaleString("en-IN")}</TableCell>
               </TableRow>
             );
           })}

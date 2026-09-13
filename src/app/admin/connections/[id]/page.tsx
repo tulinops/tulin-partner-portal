@@ -25,7 +25,10 @@ import {
 } from "@/server/documents";
 import { listInventoryItems, allocateToConnection } from "@/server/inventory";
 import { listStaffMembers } from "@/server/staff";
+import { addLeadNote } from "@/server/leads";
 import { SitePhotos } from "./site-photos";
+import { CustomerTabs } from "./customer-tabs";
+import { STAGE_LABELS } from "@/lib/connectionStage";
 import type {
   SiteVisitStatus,
   SiteVisitResult,
@@ -161,10 +164,13 @@ export default async function ConnectionDetailPage({
     warrantyRecordsWithExpiry,
     siteInspectionDetails,
     installedEquipment,
+    stage,
+    estimateLocked,
   } = detail;
   const items = await listInventoryItems();
   const staff = await listStaffMembers();
   const inspection = siteInspectionDetails ?? ({} as SiteInspectionDetails);
+  const currentEstimate = connection.lead.estimates.find((e) => e.isCurrent);
 
   async function allocateAction(formData: FormData) {
     "use server";
@@ -355,67 +361,59 @@ export default async function ConnectionDetailPage({
     });
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">{connection.customerName}</h1>
-          <p className="text-sm text-muted-foreground">
-            {connection.phone} {connection.address ? `· ${connection.address}` : ""}
-          </p>
-          <Link
-            href={`/admin/leads/${connection.leadId}`}
-            className="text-xs underline underline-offset-4 text-muted-foreground"
-          >
-            ← Back to lead
-          </Link>
-        </div>
-        <Badge variant={connection.status === "CANCELLED" ? "destructive" : connection.status === "COMPLETED" ? "default" : "secondary"}>
-          {connection.status.replace(/_/g, " ")}
-        </Badge>
-      </div>
+  async function addNoteAction(formData: FormData) {
+    "use server";
+    const followUpAt = formData.get("followUpAt");
+    await addLeadNote({
+      leadId: connection.leadId,
+      body: String(formData.get("body")),
+      followUpAt: followUpAt ? new Date(String(followUpAt)) : undefined,
+    });
+  }
 
+  const overviewSection = (
+    <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Collected</CardTitle>
           </CardHeader>
-          <CardContent className="text-xl font-semibold">{money(amountCollected)}</CardContent>
+          <CardContent className="font-mono text-xl font-semibold">{money(amountCollected)}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Allocated cost</CardTitle>
           </CardHeader>
-          <CardContent className="text-xl font-semibold">{money(allocatedCost)}</CardContent>
+          <CardContent className="font-mono text-xl font-semibold">{money(allocatedCost)}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Profit</CardTitle>
           </CardHeader>
-          <CardContent className="text-xl font-semibold">{money(profit)}</CardContent>
+          <CardContent className="font-mono text-xl font-semibold">{money(profit)}</CardContent>
         </Card>
       </div>
 
-      {connection.lead.estimates.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Estimate history</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {connection.lead.estimates.map((e) => (
-              <div key={e.id} className="flex items-center justify-between text-sm">
-                <span>
-                  {e.estimateNumber} (v{e.version}
-                  {e.isCurrent && ", current"}) — ₹{Number(e.totalAmount).toLocaleString("en-IN")}
-                </span>
-                <Link href={`/admin/estimates/${e.id}`} className="underline underline-offset-4" target="_blank">
-                  View / Print →
-                </Link>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>Record customer payment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={recordPaymentAction} className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount (₹)</Label>
+              <Input id="amount" name="amount" type="number" step="0.01" required />
+            </div>
+            <div className="space-y-2 sm:col-span-1">
+              <Label htmlFor="note">Note (optional)</Label>
+              <Input id="note" name="note" />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit">Record payment</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -452,7 +450,124 @@ export default async function ConnectionDetailPage({
           </form>
         </CardContent>
       </Card>
+    </div>
+  );
 
+  const leadSection = (
+    <Card>
+      <CardHeader>
+        <CardTitle>Lead details</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 text-sm">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-muted-foreground">Customer name</p>
+            <p className="font-medium">{connection.lead.customerName}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Phone</p>
+            <p className="font-mono font-medium">{connection.lead.phone}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Email</p>
+            <p className="font-medium">{connection.lead.email ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Source</p>
+            <p className="font-medium">{connection.lead.source}</p>
+          </div>
+          <div className="sm:col-span-2">
+            <p className="text-muted-foreground">Address</p>
+            <p className="font-medium">{connection.lead.address ?? "—"}</p>
+          </div>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Customer requirements</p>
+          <p className="font-medium">{connection.lead.requirementNotes ?? "—"}</p>
+        </div>
+        <Link
+          href={`/admin/leads/${connection.leadId}`}
+          className="inline-block text-xs text-muted-foreground underline underline-offset-4"
+        >
+          Edit from the Leads section →
+        </Link>
+      </CardContent>
+    </Card>
+  );
+
+  const estimateSection = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          Estimate
+          {estimateLocked && <Badge variant="secondary">Locked</Badge>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {estimateLocked && (
+          <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+            This estimate is locked — the job has moved into Subsidy / Loan processing. Pricing can no longer
+            change here; create a new revision from the Leads section if it must.
+          </p>
+        )}
+        {currentEstimate ? (
+          <div className="space-y-1 text-sm">
+            <p>
+              <span className="text-muted-foreground">Estimate no.</span>{" "}
+              <span className="font-mono">{currentEstimate.estimateNumber}</span> (v{currentEstimate.version})
+            </p>
+            <p>
+              <span className="text-muted-foreground">System size / brand</span>{" "}
+              {currentEstimate.systemSizeKw ? `${currentEstimate.systemSizeKw} kW` : "—"}
+              {currentEstimate.brand ? ` · ${currentEstimate.brand}` : ""}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Grand total</span>{" "}
+              <span className="font-mono">{money(Number(currentEstimate.totalAmount))}</span>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Est. subsidy</span>{" "}
+              {currentEstimate.subsidyEstimate ? money(Number(currentEstimate.subsidyEstimate)) : "—"}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Status</span> {currentEstimate.status}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No estimate found.</p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {currentEstimate && (
+            <Link href={`/admin/estimates/${currentEstimate.id}`} target="_blank">
+              <Button variant="outline" size="sm">
+                View printed estimate →
+              </Button>
+            </Link>
+          )}
+          {!estimateLocked && (
+            <Link href={`/admin/leads/${connection.leadId}`}>
+              <Button variant="outline" size="sm">
+                Edit / create revision →
+              </Button>
+            </Link>
+          )}
+        </div>
+        {connection.lead.estimates.length > 1 && (
+          <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
+            <p className="font-semibold text-foreground">History</p>
+            {connection.lead.estimates.map((e) => (
+              <p key={e.id}>
+                v{e.version} — {money(Number(e.totalAmount))} {e.isCurrent && "(current)"}
+              </p>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const siteVisitSection = (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -649,63 +764,69 @@ export default async function ConnectionDetailPage({
           </form>
         </CardContent>
       </Card>
+    </div>
+  );
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Document verification
-            <Badge variant={documentsVerified ? "default" : "secondary"}>
-              {documentsVerified ? "All verified" : "Pending"}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+  const documentsSection = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          Document verification
+          <Badge variant={documentsVerified ? "default" : "secondary"}>
+            {documentsVerified ? "All verified" : "Pending"}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          {connection.connectionDocuments.filter((d) => d.status === "VERIFIED").length} /{" "}
+          {connection.connectionDocuments.length} documents verified. Manage the required-document list from{" "}
+          <Link href="/admin/settings/documents" className="underline underline-offset-4">
+            Business Profile
+          </Link>
+          .
+        </p>
+        {connection.connectionDocuments.map((doc) => (
+          <form key={doc.id} action={documentStatusAction} className="grid items-end gap-3 border-b pb-3 last:border-b-0 sm:grid-cols-4">
+            <input type="hidden" name="connectionDocumentId" value={doc.id} />
+            <div className="sm:col-span-1">
+              <Label className="font-normal">{doc.requiredDocumentType.name}</Label>
+            </div>
+            <div className="space-y-2">
+              <Select name="status" defaultValue={doc.status}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOCUMENT_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {s.replace(/_/g, " ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Input name="remarks" placeholder="Remarks" defaultValue={doc.remarks ?? ""} />
+            </div>
+            <div>
+              <Button type="submit" size="sm">
+                Save
+              </Button>
+            </div>
+          </form>
+        ))}
+        {connection.connectionDocuments.length === 0 && (
           <p className="text-sm text-muted-foreground">
-            {connection.connectionDocuments.filter((d) => d.status === "VERIFIED").length} /{" "}
-            {connection.connectionDocuments.length} documents verified. Manage the required-document list from{" "}
-            <Link href="/admin/settings/documents" className="underline underline-offset-4">
-              Business Profile
-            </Link>
-            .
+            No required document types configured yet — add some from Business Profile.
           </p>
-          {connection.connectionDocuments.map((doc) => (
-            <form key={doc.id} action={documentStatusAction} className="grid gap-3 sm:grid-cols-4 items-end border-b pb-3 last:border-b-0">
-              <input type="hidden" name="connectionDocumentId" value={doc.id} />
-              <div className="sm:col-span-1">
-                <Label className="font-normal">{doc.requiredDocumentType.name}</Label>
-              </div>
-              <div className="space-y-2">
-                <Select name="status" defaultValue={doc.status}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DOCUMENT_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Input name="remarks" placeholder="Remarks" defaultValue={doc.remarks ?? ""} />
-              </div>
-              <div>
-                <Button type="submit" size="sm">
-                  Save
-                </Button>
-              </div>
-            </form>
-          ))}
-          {connection.connectionDocuments.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No required document types configured yet — add some from Business Profile.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </CardContent>
+    </Card>
+  );
 
+  const subsidyLoanSection = (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>How is the customer paying?</CardTitle>
@@ -963,62 +1084,11 @@ export default async function ConnectionDetailPage({
           </CardContent>
         </Card>
       )}
+    </div>
+  );
 
-      {items.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocate inventory</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={allocateAction} className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="inventoryItemId">Item</Label>
-                <Select name="inventoryItemId" required>
-                  <SelectTrigger id="inventoryItemId">
-                    <SelectValue placeholder="Select item" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {items.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.runningStock.toString()} {item.unit} available)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input id="quantity" name="quantity" type="number" step="0.01" required />
-              </div>
-              <div className="flex items-end">
-                <Button type="submit">Allocate</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Record customer payment</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={recordPaymentAction} className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount (₹)</Label>
-              <Input id="amount" name="amount" type="number" step="0.01" required />
-            </div>
-            <div className="space-y-2 sm:col-span-1">
-              <Label htmlFor="note">Note (optional)</Label>
-              <Input id="note" name="note" />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Record payment</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
+  const installationSection = (
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Installation</CardTitle>
@@ -1084,7 +1154,7 @@ export default async function ConnectionDetailPage({
             </form>
           </div>
 
-          <form action={signOffAction} className="grid gap-4 sm:grid-cols-3 border-t pt-4">
+          <form action={signOffAction} className="grid gap-4 border-t pt-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="signedOffByName">Signed off by</Label>
               <Input
@@ -1104,87 +1174,46 @@ export default async function ConnectionDetailPage({
             {connection.installationSignedOffAt && (
               <p className="text-xs text-muted-foreground sm:col-span-3">
                 Signed off {connection.installationSignedOffAt.toLocaleDateString("en-IN")}. Completing this
-                auto-creates warranty records below from the equipment list, using sensible default periods you can
-                edit.
+                auto-creates warranty records from the equipment list, using sensible default periods you can edit.
               </p>
             )}
           </form>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Warranty</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {warrantyRecordsWithExpiry.map((w) => (
-            <div key={w.id} className="rounded-md border p-3 text-sm">
-              <p className="font-medium">
-                {w.productName} <span className="text-muted-foreground">({w.equipmentType.replace(/_/g, " ")})</span>
-              </p>
-              <p className="text-muted-foreground">
-                {[w.manufacturer, w.model, w.serialNumber].filter(Boolean).join(" · ") || "—"}
-              </p>
-              <p>
-                {w.warrantyType.replace(/_/g, " ")} warranty · {w.periodMonths} months from{" "}
-                {w.startDate.toLocaleDateString("en-IN")} · expires {w.expiryDate.toLocaleDateString("en-IN")}
-              </p>
-            </div>
-          ))}
-          {warrantyRecordsWithExpiry.length === 0 && (
-            <p className="text-sm text-muted-foreground">No warranty records yet.</p>
-          )}
-
-          <form action={warrantyCreateAction} className="grid gap-4 sm:grid-cols-3 border-t pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="equipmentType">Equipment type</Label>
-              <Select name="equipmentType" required>
-                <SelectTrigger id="equipmentType">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EQUIPMENT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="productName">Product name</Label>
-              <Input id="productName" name="productName" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="manufacturer">Manufacturer</Label>
-              <Input id="manufacturer" name="manufacturer" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
-              <Input id="model" name="model" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="serialNumber">Serial number</Label>
-              <Input id="serialNumber" name="serialNumber" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Start date</Label>
-              <Input id="startDate" name="startDate" type="date" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="periodMonths">Period (months)</Label>
-              <Input id="periodMonths" name="periodMonths" type="number" required />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="terms">Terms</Label>
-              <Input id="terms" name="terms" />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Add warranty record</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      {items.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Allocate inventory</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form action={allocateAction} className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="inventoryItemId">Item</Label>
+                <Select name="inventoryItemId" required>
+                  <SelectTrigger id="inventoryItemId">
+                    <SelectValue placeholder="Select item" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {items.map((item) => (
+                      <SelectItem key={item.id} value={item.id}>
+                        {item.name} ({item.runningStock.toString()} {item.unit} available)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input id="quantity" name="quantity" type="number" step="0.01" required />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit">Allocate</Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -1220,6 +1249,151 @@ export default async function ConnectionDetailPage({
           </Table>
         </CardContent>
       </Card>
+    </div>
+  );
+
+  const warrantySection = (
+    <Card>
+      <CardHeader>
+        <CardTitle>Warranty</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {warrantyRecordsWithExpiry.map((w) => (
+          <div key={w.id} className="rounded-md border p-3 text-sm">
+            <p className="font-medium">
+              {w.productName} <span className="text-muted-foreground">({w.equipmentType.replace(/_/g, " ")})</span>
+            </p>
+            <p className="text-muted-foreground">
+              {[w.manufacturer, w.model, w.serialNumber].filter(Boolean).join(" · ") || "—"}
+            </p>
+            <p>
+              {w.warrantyType.replace(/_/g, " ")} warranty · {w.periodMonths} months from{" "}
+              {w.startDate.toLocaleDateString("en-IN")} · expires {w.expiryDate.toLocaleDateString("en-IN")}
+            </p>
+          </div>
+        ))}
+        {warrantyRecordsWithExpiry.length === 0 && (
+          <p className="text-sm text-muted-foreground">No warranty records yet.</p>
+        )}
+
+        <form action={warrantyCreateAction} className="grid gap-4 border-t pt-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="equipmentType">Equipment type</Label>
+            <Select name="equipmentType" required>
+              <SelectTrigger id="equipmentType">
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                {EQUIPMENT_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t.replace(/_/g, " ")}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="productName">Product name</Label>
+            <Input id="productName" name="productName" required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="manufacturer">Manufacturer</Label>
+            <Input id="manufacturer" name="manufacturer" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="model">Model</Label>
+            <Input id="model" name="model" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="serialNumber">Serial number</Label>
+            <Input id="serialNumber" name="serialNumber" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="startDate">Start date</Label>
+            <Input id="startDate" name="startDate" type="date" required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="periodMonths">Period (months)</Label>
+            <Input id="periodMonths" name="periodMonths" type="number" required />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="terms">Terms</Label>
+            <Input id="terms" name="terms" />
+          </div>
+          <div className="flex items-end">
+            <Button type="submit">Add warranty record</Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+
+  const activitySection = (
+    <Card>
+      <CardHeader>
+        <CardTitle>Activity &amp; notes</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <form action={addNoteAction} className="space-y-2">
+          <Textarea name="body" placeholder="Add a note..." required />
+          <div className="flex items-center gap-2">
+            <Label htmlFor="followUpAt" className="text-sm text-muted-foreground">
+              Follow up on
+            </Label>
+            <Input id="followUpAt" name="followUpAt" type="date" className="w-auto" />
+            <Button type="submit" size="sm">
+              Add note
+            </Button>
+          </div>
+        </form>
+        <div className="space-y-3 border-t pt-4">
+          {connection.lead.notes.map((note) => (
+            <div key={note.id} className="text-sm">
+              <p>{note.body}</p>
+              <p className="text-xs text-muted-foreground">
+                {note.createdAt.toLocaleString()}
+                {note.followUpAt && ` · follow up ${note.followUpAt.toLocaleDateString()}`}
+              </p>
+            </div>
+          ))}
+          {connection.lead.notes.length === 0 && <p className="text-sm text-muted-foreground">No notes yet.</p>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="font-heading text-xs font-semibold tracking-wide text-primary uppercase">
+            Customer #{connection.id.slice(-6).toUpperCase()}
+          </p>
+          <h1 className="font-heading text-2xl font-extrabold">{connection.customerName}</h1>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span className="font-mono font-semibold text-foreground">{connection.phone}</span>
+            <span>
+              Lead source: <span className="font-semibold text-foreground">{connection.lead.source}</span>
+            </span>
+          </div>
+        </div>
+        <Badge variant={connection.status === "CANCELLED" ? "destructive" : connection.status === "COMPLETED" ? "default" : "secondary"}>
+          {STAGE_LABELS[stage]}
+        </Badge>
+      </div>
+
+      <CustomerTabs
+        currentStage={stage}
+        overview={overviewSection}
+        lead={leadSection}
+        estimate={estimateSection}
+        sitevisit={siteVisitSection}
+        documents={documentsSection}
+        subsidyloan={subsidyLoanSection}
+        installation={installationSection}
+        warranty={warrantySection}
+        activity={activitySection}
+      />
     </div>
   );
 }

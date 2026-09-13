@@ -25,7 +25,7 @@ export default async function StaffPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Staff</h1>
+      <h1 className="font-heading text-2xl font-extrabold">Staff</h1>
       <p className="text-sm text-muted-foreground">
         Workers you assign to site visits and installations. No login access — this is just a name/phone record.
       </p>

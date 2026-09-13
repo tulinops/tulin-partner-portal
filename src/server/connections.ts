@@ -5,6 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
+import { computeConnectionStage, isEstimateLocked } from "@/lib/connectionStage";
 import type {
   ConnectionStatus,
   SubsidyStatus,
@@ -31,7 +32,12 @@ export async function getConnectionDetail(connectionId: string) {
   const connection = await db.connection.findFirst({
     where: { id: connectionId },
     include: {
-      lead: { include: { estimates: { orderBy: { version: "desc" } } } },
+      lead: {
+        include: {
+          estimates: { orderBy: { version: "desc" } },
+          notes: { orderBy: { createdAt: "desc" } },
+        },
+      },
       payments: { orderBy: { paidAt: "desc" } },
       inventoryTxns: { include: { inventoryItem: true }, orderBy: { createdAt: "desc" } },
       staffMember: true,
@@ -69,6 +75,22 @@ export async function getConnectionDetail(connectionId: string) {
   const siteInspectionDetails = (connection.siteInspectionDetails ?? null) as SiteInspectionDetails | null;
   const installedEquipment = (connection.installedEquipment ?? []) as InstalledEquipmentItem[];
 
+  const stage = computeConnectionStage({
+    siteVisitStatus: connection.siteVisitStatus,
+    documentsVerified,
+    subsidyStatus: connection.subsidyStatus,
+    currentLoanStatus: currentLoanApplication?.status ?? null,
+    installationStatus: connection.installationStatus,
+    connectionStatus: connection.status,
+    warrantyRecordCount: connection.warrantyRecords.length,
+  });
+
+  const estimateLocked = isEstimateLocked({
+    financingMethod: connection.financingMethod,
+    subsidyStatus: connection.subsidyStatus,
+    loanApplicationsCount: connection.loanApplications.length,
+  });
+
   return {
     connection,
     amountCollected,
@@ -80,6 +102,8 @@ export async function getConnectionDetail(connectionId: string) {
     warrantyRecordsWithExpiry,
     siteInspectionDetails,
     installedEquipment,
+    stage,
+    estimateLocked,
   };
 }
 

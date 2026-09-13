@@ -11,10 +11,21 @@ export default async function SuperAdminLayout({ children }: { children: React.R
   await requireSuperAdmin();
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="border-b">
+    <div className="min-h-screen flex flex-col bg-background">
+      <header className="border-b border-border">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <span className="text-sm font-medium">Tulin Partner Portal — Super Admin</span>
+          <div className="flex items-center gap-2.5">
+            <span
+              aria-hidden
+              className="size-2.5 shrink-0 rotate-45 rounded-[3px] bg-primary"
+            />
+            <span className="font-heading text-base font-extrabold tracking-tight">
+              Tulin Partner Portal
+              <span className="ml-1.5 font-sans text-xs font-semibold text-muted-foreground">
+                Super Admin
+              </span>
+            </span>
+          </div>
           <form action={logoutAction}>
             <Button variant="ghost" size="sm" type="submit">
               Sign out

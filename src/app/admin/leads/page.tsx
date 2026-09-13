@@ -44,7 +44,7 @@ export default async function LeadsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Leads</h1>
+      <h1 className="font-heading text-2xl font-extrabold">Leads</h1>
 
       <Card>
         <CardHeader>

@@ -40,7 +40,7 @@ export default async function RequiredDocumentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Required documents</h1>
+        <h1 className="font-heading text-2xl font-extrabold">Required documents</h1>
         <p className="text-sm text-muted-foreground">
           The checklist every customer&apos;s connection is verified against. Add or retire document types here — it
           applies to every connection automatically.{" "}

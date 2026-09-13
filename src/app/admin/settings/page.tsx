@@ -21,7 +21,7 @@ export default async function BusinessProfilePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Business Profile</h1>
+      <h1 className="font-heading text-2xl font-extrabold">Business Profile</h1>
       <p className="text-sm text-muted-foreground">
         This appears on the letterhead of every printed estimate.
       </p>
