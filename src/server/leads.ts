@@ -95,31 +95,12 @@ async function createConnectionFromLead(
   });
 }
 
-export async function moveLeadStage(leadId: string, stage: LeadStage) {
-  const { db, tenantId } = await getTenantDb();
-
-  if (stage === "WON") {
-    const lead = await db.lead.findFirst({
-      where: { id: leadId },
-      include: { connection: true, estimates: { where: { isCurrent: true }, take: 1 } },
-    });
-    if (!lead) throw new Error("Lead not found");
-
-    // Moving a lead to Won is what starts the customer journey — create the
-    // Connection automatically here instead of a separate manual step, using
-    // whatever address/system size the lead and its final estimate already have.
-    if (!lead.connection) {
-      const systemSizeKw = lead.estimates[0]?.systemSizeKw;
-      await db.$transaction((tx) =>
-        createConnectionFromLead(tx, lead, tenantId, systemSizeKw ? Number(systemSizeKw) : undefined),
-      );
-      revalidatePath("/admin/leads");
-      revalidatePath(`/admin/leads/${leadId}`);
-      revalidatePath("/admin/connections");
-      return;
-    }
-  }
-
+// "WON" is deliberately excluded here — it's only ever set as a byproduct of
+// scheduleSiteVisit() actually creating the Connection (via
+// createConnectionFromLead), which requires an approved quotation first. A
+// manual stage button bypassed that guard, so Won can no longer be set this way.
+export async function moveLeadStage(leadId: string, stage: Exclude<LeadStage, "WON">) {
+  const { db } = await getTenantDb();
   await db.lead.update({ where: { id: leadId }, data: { stage } });
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);

@@ -12,7 +12,7 @@ import { EstimateWorkflowSection } from "./estimate-workflow-section";
 import { CustomerTabs } from "@/app/admin/connections/[id]/customer-tabs";
 import { getBusinessProfile } from "@/server/business-profile";
 
-const STAGES = ["NEW", "CONTACTED", "SITE_VISIT", "QUOTED", "WON", "LOST"] as const;
+const STAGES = ["NEW", "CONTACTED", "SITE_VISIT", "QUOTED", "LOST"] as const;
 
 const NOT_YET_A_CUSTOMER = (
   <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -85,7 +85,8 @@ export default async function LeadDetailPage({
             ))}
           </form>
           <p className="mt-2 text-xs text-muted-foreground">
-            Marking a lead <strong>Won</strong> automatically creates its customer record.
+            <strong>Won</strong> is set automatically once a quotation is approved and its site visit is
+            scheduled from the Estimate tab. <strong>Lost</strong> can be marked at any stage.
           </p>
         </CardContent>
       </Card>
