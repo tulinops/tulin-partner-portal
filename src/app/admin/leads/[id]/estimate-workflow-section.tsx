@@ -11,7 +11,7 @@ import {
   type getLead,
 } from "@/server/leads";
 import { EstimateBuilderWithPreview } from "./estimate-builder-with-preview";
-import { SOLAR_BRANDS, type SolarBrandValue } from "@/lib/estimateBrands";
+import { SOLAR_BRANDS, brandLabel, type SolarBrandValue } from "@/lib/estimateBrands";
 import { DEFAULT_ESTIMATE_TERMS, DEFAULT_ESTIMATE_ROWS } from "@/lib/estimateDefaults";
 import { isEstimateLocked, STAGE_ORDER, type ConnectionStageKey } from "@/lib/connectionStage";
 import type { EstimateStatus } from "@/generated/prisma/enums";
@@ -65,6 +65,18 @@ function parseLineItemsFromForm(formData: FormData): EstimateLineItem[] {
 function parseBrandFromForm(formData: FormData): SolarBrandValue | undefined {
   const rawBrand = String(formData.get("brand") || "");
   return SOLAR_BRANDS.some((b) => b.value === rawBrand) ? (rawBrand as SolarBrandValue) : undefined;
+}
+
+// Replaces the meaningless "v1"/"v2" tab labels with something that actually
+// distinguishes the options being compared (brand + capacity), falling back
+// to the version number only for a quote that hasn't been filled in yet.
+function quoteTabLabel(e: EstimateRecord): string {
+  const brand = brandLabel(e.brand);
+  const size = e.systemSizeKw ? `${Number(e.systemSizeKw)}kW` : null;
+  if (brand && size) return `${brand} ${size}`;
+  if (brand) return brand;
+  if (size) return size;
+  return `Draft v${e.version}`;
 }
 
 /**
@@ -198,7 +210,7 @@ export async function EstimateWorkflowSection({
                 : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
-            v{e.version}
+            {quoteTabLabel(e)}
             {e.isCurrent && " · ✓ Final"}
           </Link>
         ))}
