@@ -74,6 +74,7 @@ export function EstimateBuilderWithPreview({
   );
   const [validUntil, setValidUntil] = useState(defaultValidUntil);
   const [notes, setNotes] = useState(initialNotes);
+  const [showPreview, setShowPreview] = useState(false);
 
   const capacityValue = parseFloat(capacity);
   const capacityValid = !Number.isNaN(capacityValue) && capacityValue > 0;
@@ -131,7 +132,7 @@ export function EstimateBuilderWithPreview({
   const netPayable = grandTotal - subsidyValue;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <div className={showPreview ? "grid gap-6 lg:grid-cols-[1fr_380px]" : ""}>
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="systemSizeKw">System size (kW)</Label>
@@ -280,8 +281,13 @@ export function EstimateBuilderWithPreview({
           <Label htmlFor="notes">Terms &amp; conditions</Label>
           <Textarea id="notes" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={8} />
         </div>
+
+        <Button type="button" variant="outline" size="sm" onClick={() => setShowPreview((v) => !v)}>
+          {showPreview ? "Hide preview" : "Preview estimate"}
+        </Button>
       </div>
 
+      {showPreview && (
       <div className="lg:sticky lg:top-4 lg:self-start">
         <p className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">Live preview</p>
         <div
@@ -390,6 +396,7 @@ export function EstimateBuilderWithPreview({
           </p>
         </div>
       </div>
+      )}
     </div>
   );
 }
