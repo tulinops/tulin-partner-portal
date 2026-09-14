@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLead, moveLeadStage, addLeadNote, updateLeadDetails } from "@/server/leads";
+import { getLead, addLeadNote, updateLeadDetails } from "@/server/leads";
 import { getConnectionStageForLead } from "@/server/connections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,14 +12,27 @@ import { EstimateWorkflowSection } from "./estimate-workflow-section";
 import { CustomerTabs } from "@/app/admin/connections/[id]/customer-tabs";
 import { getBusinessProfile } from "@/server/business-profile";
 
-const STAGES = ["NEW", "CONTACTED", "SITE_VISIT", "QUOTED", "LOST"] as const;
-
 const NOT_YET_A_CUSTOMER = (
   <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-    Available once this lead becomes a customer — mark the pipeline stage <strong>Won</strong> above to start
-    the customer journey.
+    Available once this lead becomes a customer — approve a quotation and schedule its site visit from the
+    Estimate tab to start the customer journey.
   </p>
 );
+
+function seeOnConnectionPage(connectionId: string) {
+  return (
+    <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+      This lead has already converted to a customer — its Site Visit, Documents, Payments, Installation,
+      Invoice and Warranty tabs are managed from there instead of here.{" "}
+      <Link
+        href={`/admin/connections/${connectionId}`}
+        className="font-semibold text-primary underline underline-offset-4"
+      >
+        View the Connection page →
+      </Link>
+    </p>
+  );
+}
 
 export default async function LeadDetailPage({
   params,
@@ -34,14 +47,10 @@ export default async function LeadDetailPage({
   if (!lead) notFound();
   const tenant = await getBusinessProfile();
   const connectionStage = lead.connection ? await getConnectionStageForLead(id) : null;
+  const customerOnlyTabContent = lead.connection ? seeOnConnectionPage(lead.connection.id) : NOT_YET_A_CUSTOMER;
 
   const currentEstimate = lead.estimates.find((e) => e.isCurrent);
   const stage = connectionStage ?? (lead.estimates.length > 0 ? "estimate" : "lead");
-
-  async function moveStageAction(formData: FormData) {
-    "use server";
-    await moveLeadStage(id, formData.get("stage") as (typeof STAGES)[number]);
-  }
 
   async function addNoteAction(formData: FormData) {
     "use server";
@@ -65,41 +74,6 @@ export default async function LeadDetailPage({
 
   const overviewSection = (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Pipeline stage</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {lead.connection ? (
-            <p className="text-sm text-muted-foreground">
-              This lead has converted to a customer — its pipeline stage is fixed at <strong>Won</strong> and can
-              no longer be changed here. Manage further progress from the Connection page.
-            </p>
-          ) : (
-            <>
-              <form action={moveStageAction} className="flex flex-wrap gap-2">
-                {STAGES.map((s) => (
-                  <Button
-                    key={s}
-                    type="submit"
-                    name="stage"
-                    value={s}
-                    variant={s === lead.stage ? "default" : "outline"}
-                    size="sm"
-                  >
-                    {s.replace("_", " ")}
-                  </Button>
-                ))}
-              </form>
-              <p className="mt-2 text-xs text-muted-foreground">
-                <strong>Won</strong> is set automatically once a quotation is approved and its site visit is
-                scheduled from the Estimate tab. <strong>Lost</strong> can be marked at any stage.
-              </p>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
@@ -262,12 +236,12 @@ export default async function LeadDetailPage({
         overview={overviewSection}
         lead={leadSection}
         estimate={estimateSection}
-        sitevisit={NOT_YET_A_CUSTOMER}
-        documents={NOT_YET_A_CUSTOMER}
-        subsidyloan={NOT_YET_A_CUSTOMER}
-        installation={NOT_YET_A_CUSTOMER}
-        invoice={NOT_YET_A_CUSTOMER}
-        warranty={NOT_YET_A_CUSTOMER}
+        sitevisit={customerOnlyTabContent}
+        documents={customerOnlyTabContent}
+        subsidyloan={customerOnlyTabContent}
+        installation={customerOnlyTabContent}
+        invoice={customerOnlyTabContent}
+        warranty={customerOnlyTabContent}
         activity={activitySection}
       />
     </div>
