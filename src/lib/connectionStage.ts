@@ -20,7 +20,7 @@ export const STAGE_LABELS: Record<ConnectionStageKey, string> = {
   estimate: "Estimate",
   sitevisit: "Site Visit",
   documents: "Documents",
-  subsidyloan: "Subsidy / Loan",
+  subsidyloan: "Payments",
   installation: "Installation",
   completed: "Completed",
   warranty: "Warranty",

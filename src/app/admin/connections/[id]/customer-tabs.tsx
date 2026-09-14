@@ -12,7 +12,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "estimate", label: "Estimate" },
   { key: "sitevisit", label: "Site Visit" },
   { key: "documents", label: "Documents" },
-  { key: "subsidyloan", label: "Subsidy / Loan" },
+  { key: "subsidyloan", label: "Payments" },
   { key: "installation", label: "Installation" },
   { key: "warranty", label: "Warranty" },
   { key: "activity", label: "Activity / Notes" },

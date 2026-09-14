@@ -400,27 +400,6 @@ export default async function ConnectionDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Record customer payment</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={recordPaymentAction} className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount (₹)</Label>
-              <Input id="amount" name="amount" type="number" step="0.01" required />
-            </div>
-            <div className="space-y-2 sm:col-span-1">
-              <Label htmlFor="note">Note (optional)</Label>
-              <Input id="note" name="note" />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Record payment</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Status &amp; installer</CardTitle>
         </CardHeader>
         <CardContent>
@@ -429,7 +408,7 @@ export default async function ConnectionDetailPage({
             <p className="text-sm font-medium">
               {connection.status.replace(/_/g, " ")}
               <span className="ml-2 text-xs font-normal text-muted-foreground">
-                (advances automatically from the Site Visit / Subsidy-Loan / Installation tabs)
+                (advances automatically from the Site Visit / Payments / Installation tabs)
               </span>
             </p>
           </div>
@@ -753,7 +732,7 @@ export default async function ConnectionDetailPage({
           }
         >
           {documentsVerified
-            ? "All documents verified — ready to move this customer to Subsidy / Loan."
+            ? "All documents verified — ready to move this customer to Payments."
             : `${connection.connectionDocuments.filter((d) => d.status === "VERIFIED").length} / ${connection.connectionDocuments.length} documents verified — uploading a file is not enough on its own. Review the uploaded file, then set each document's status to "Verified" and Save, to move this customer forward.`}
         </div>
         <p className="text-xs text-muted-foreground">
@@ -834,11 +813,33 @@ export default async function ConnectionDetailPage({
         }
       >
         {!subsidyLoanReached
-          ? `This customer hasn't reached Subsidy / Loan yet — the current stage is still "${STAGE_LABELS[stage]}". Anything saved here is kept, but won't count as progress until that catches up.`
+          ? `This customer hasn't reached Payments yet — the current stage is still "${STAGE_LABELS[stage]}". Anything saved here is kept, but won't count as progress until that catches up.`
           : stage === "subsidyloan"
             ? 'Financing isn\'t settled yet — set the subsidy status to "Disbursed", or the loan status to "Completed", to move this customer to Installation.'
             : "Financing settled — this customer has moved to Installation."}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Record customer payment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={recordPaymentAction} className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount (₹)</Label>
+              <Input id="amount" name="amount" type="number" step="0.01" required />
+            </div>
+            <div className="space-y-2 sm:col-span-1">
+              <Label htmlFor="note">Note (optional)</Label>
+              <Input id="note" name="note" />
+            </div>
+            <div className="flex items-end">
+              <Button type="submit">Record payment</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>How is the customer paying?</CardTitle>

@@ -250,7 +250,7 @@ export async function EstimateWorkflowSection({
 
       {stageAdvanced && (
         <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-          This lead has moved into Subsidy / Loan processing or later — quotations are frozen and can no
+          This lead has moved into the Payments stage or later — quotations are frozen and can no
           longer be changed.
         </p>
       )}
