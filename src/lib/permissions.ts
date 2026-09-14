@@ -16,3 +16,13 @@ export async function requireSuperAdmin() {
   }
   return session;
 }
+
+// Any logged-in user, Admin or Super Admin — for account-level actions
+// (like changing your own password) that aren't tied to a specific role.
+export async function requireAuth() {
+  const session = await auth();
+  if (!session?.user) {
+    redirect("/login");
+  }
+  return session;
+}

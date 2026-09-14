@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/permissions";
 import { signOut } from "@/auth";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <NavTabs />
+            <Link href="/change-password">
+              <Button variant="ghost" size="sm">
+                Change password
+              </Button>
+            </Link>
             <form action={logoutAction}>
               <Button variant="ghost" size="sm" type="submit">
                 Sign out
