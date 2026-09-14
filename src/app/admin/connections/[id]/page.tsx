@@ -744,9 +744,19 @@ export default async function ConnectionDetailPage({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {connection.connectionDocuments.filter((d) => d.status === "VERIFIED").length} /{" "}
-          {connection.connectionDocuments.length} documents verified. Manage the required-document list from{" "}
+        <div
+          className={
+            documentsVerified
+              ? "rounded-md bg-primary/10 p-3 text-sm font-medium text-primary"
+              : "rounded-md bg-amber-100 p-3 text-sm font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+          }
+        >
+          {documentsVerified
+            ? "All documents verified — ready to move this customer to Subsidy / Loan."
+            : `${connection.connectionDocuments.filter((d) => d.status === "VERIFIED").length} / ${connection.connectionDocuments.length} documents verified — uploading a file is not enough on its own. Review the uploaded file, then set each document's status to "Verified" and Save, to move this customer forward.`}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Manage the required-document list from{" "}
           <Link href="/admin/settings/documents" className="underline underline-offset-4">
             Business Profile
           </Link>
