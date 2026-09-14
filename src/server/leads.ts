@@ -167,10 +167,29 @@ export async function addLeadNote(input: {
 export type EstimateLineItem = {
   description: string;
   spec?: string;
+  // Per-item brand — different components (panels vs. inverter vs. balance
+  // of system) can legitimately come from different manufacturers, so this
+  // replaces what used to be a single brand for the whole estimate.
+  brand?: string;
   qty: number;
   rate: number;
   amount: number;
+  // Per-item GST — different line items (panels vs. balance-of-system vs.
+  // labor) can legitimately sit in different GST slabs, so this replaces
+  // what used to be a single flat GST% for the whole estimate.
+  gstPercent: number;
 };
+
+function computeEstimateTotals(items: EstimateLineItem[]) {
+  const subtotal = items.reduce((sum, li) => sum + li.amount, 0);
+  const gstAmount = items.reduce((sum, li) => sum + li.amount * ((li.gstPercent || 0) / 100), 0);
+  const totalAmount = subtotal + gstAmount;
+  // Estimate.gstPercent is no longer an input — it's the blended/effective
+  // rate derived from the line items, kept only for display (e.g. the
+  // printed estimate's "GST (X%)" summary row) and analytics.
+  const gstPercent = subtotal > 0 ? (gstAmount / subtotal) * 100 : 0;
+  return { subtotal, gstAmount, totalAmount, gstPercent };
+}
 
 async function generateEstimateNumber(tenantSlug: string) {
   const now = new Date();
@@ -193,7 +212,6 @@ export async function createEstimate(input: {
   systemSizeKw?: number;
   brand?: SolarBrand;
   lineItems: EstimateLineItem[];
-  gstPercent?: number;
   subsidyEstimate?: number;
   validUntil?: Date;
   notes?: string;
@@ -209,11 +227,8 @@ export async function createEstimate(input: {
   // amounts are never trusted.
   const items = input.lineItems
     .filter((li) => li.description.trim().length > 0)
-    .map((li) => ({ ...li, amount: li.qty * li.rate }));
-  const subtotal = items.reduce((sum, li) => sum + li.amount, 0);
-  const gstPercent = input.gstPercent ?? 0;
-  const gstAmount = subtotal * (gstPercent / 100);
-  const totalAmount = subtotal + gstAmount;
+    .map((li) => ({ ...li, amount: li.qty * li.rate, gstPercent: li.gstPercent || 0 }));
+  const { subtotal, gstAmount, totalAmount, gstPercent } = computeEstimateTotals(items);
   const estimateNumber = await generateEstimateNumber(tenant.slug);
 
   // Quotations coexist rather than superseding one another — a lead can have
@@ -304,7 +319,6 @@ export async function updateEstimateFields(
     systemSizeKw?: number;
     brand?: SolarBrand;
     lineItems?: EstimateLineItem[];
-    gstPercent?: number;
     subsidyEstimate?: number;
     validUntil?: Date;
     notes?: string;
@@ -317,11 +331,8 @@ export async function updateEstimateFields(
 
   const items = input.lineItems
     ?.filter((li) => li.description.trim().length > 0)
-    .map((li) => ({ ...li, amount: li.qty * li.rate }));
-  const subtotal = items?.reduce((sum, li) => sum + li.amount, 0);
-  const gstPercent = input.gstPercent ?? Number(estimate.gstPercent);
-  const gstAmount = subtotal !== undefined ? subtotal * (gstPercent / 100) : undefined;
-  const totalAmount = subtotal !== undefined && gstAmount !== undefined ? subtotal + gstAmount : undefined;
+    .map((li) => ({ ...li, amount: li.qty * li.rate, gstPercent: li.gstPercent || 0 }));
+  const totals = items ? computeEstimateTotals(items) : undefined;
 
   await db.estimate.update({
     where: { id: estimateId },
@@ -329,10 +340,10 @@ export async function updateEstimateFields(
       systemSizeKw: input.systemSizeKw,
       brand: input.brand,
       lineItems: items,
-      subtotal,
-      gstPercent: input.gstPercent,
-      gstAmount,
-      totalAmount,
+      subtotal: totals?.subtotal,
+      gstPercent: totals?.gstPercent,
+      gstAmount: totals?.gstAmount,
+      totalAmount: totals?.totalAmount,
       subsidyEstimate: input.subsidyEstimate,
       validUntil: input.validUntil,
       notes: input.notes,

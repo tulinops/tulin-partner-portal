@@ -6,16 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { SOLAR_BRANDS, buildBrandLineItems, brandLabel, type SolarBrandValue } from "@/lib/estimateBrands";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SOLAR_BRANDS, brandLabel } from "@/lib/estimateBrands";
 import { amountInWords } from "@/lib/amountInWords";
-import { DEFAULT_ESTIMATE_ROWS, type EstimateBuilderRow } from "@/lib/estimateDefaults";
+import { DEFAULT_ESTIMATE_ROWS, DEFAULT_ITEM_GST_PERCENT, type EstimateBuilderRow } from "@/lib/estimateDefaults";
 
 export type { EstimateBuilderRow };
-
-const INACTIVE_BRAND_BTN =
-  "rounded-md border-2 border-[#16823b] bg-white px-4 py-2 text-sm font-bold text-[#16823b] disabled:cursor-not-allowed disabled:opacity-45";
-const ACTIVE_BRAND_BTN =
-  "rounded-md border-2 border-[#16823b] bg-[#16823b] px-4 py-2 text-sm font-bold text-white";
 
 function money(n: number) {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -33,9 +29,7 @@ export function EstimateBuilderWithPreview({
   tenantEmail,
   defaultValidUntil,
   initialCapacity,
-  initialBrand,
   initialRows,
-  initialGstPercent = 5,
   initialSubsidyEstimate,
   initialNotes,
   locked = false,
@@ -51,17 +45,13 @@ export function EstimateBuilderWithPreview({
   tenantEmail?: string | null;
   defaultValidUntil: string;
   initialCapacity?: number;
-  initialBrand?: SolarBrandValue;
   initialRows?: EstimateBuilderRow[];
-  initialGstPercent?: number;
   initialSubsidyEstimate?: number;
   initialNotes: string;
   locked?: boolean;
 }) {
   const [capacity, setCapacity] = useState(initialCapacity ? String(initialCapacity) : "");
-  const [brand, setBrand] = useState<SolarBrandValue | "">(initialBrand ?? "");
   const [rows, setRows] = useState<EstimateBuilderRow[]>(initialRows ?? DEFAULT_ESTIMATE_ROWS);
-  const [gstPercent, setGstPercent] = useState(String(initialGstPercent));
   const [subsidyEstimate, setSubsidyEstimate] = useState(
     initialSubsidyEstimate ? String(initialSubsidyEstimate) : "",
   );
@@ -72,45 +62,32 @@ export function EstimateBuilderWithPreview({
   const capacityValue = parseFloat(capacity);
   const capacityValid = !Number.isNaN(capacityValue) && capacityValue > 0;
 
-  function selectBrand(value: SolarBrandValue, label: string) {
-    if (!capacityValid) return;
-    setBrand(value);
-    setRows((prev) =>
-      buildBrandLineItems(label, capacityValue).map((r, i) => ({
-        ...r,
-        qty: prev[i]?.qty ?? 1,
-        rate: prev[i]?.rate ?? 0,
-      })),
-    );
-  }
-
   function handleCapacityChange(next: string) {
     setCapacity(next);
-    const nextValue = parseFloat(next);
-    if (brand && !Number.isNaN(nextValue) && nextValue > 0) {
-      const label = SOLAR_BRANDS.find((b) => b.value === brand)?.label ?? "";
-      setRows((prev) =>
-        buildBrandLineItems(label, nextValue).map((r, i) => ({
-          ...r,
-          qty: prev[i]?.qty ?? 1,
-          rate: prev[i]?.rate ?? 0,
-        })),
-      );
-    }
   }
 
   function updateRow(i: number, field: keyof EstimateBuilderRow, value: string) {
     setRows((prev) =>
       prev.map((r, idx) =>
         idx === i
-          ? { ...r, [field]: field === "qty" || field === "rate" ? Number(value) || 0 : value }
+          ? {
+              ...r,
+              [field]:
+                field === "qty" || field === "rate" || field === "gstPercent" ? Number(value) || 0 : value,
+            }
           : r,
       ),
     );
   }
 
+  // Estimate.brand (the estimate's overall stored brand — used for the quote
+  // tab label and print header) is derived from whichever line item picked
+  // one first, now that brand is set per item rather than once for the
+  // whole quote.
+  const primaryBrand = rows.find((r) => r.brand)?.brand ?? "";
+
   function addRow() {
-    setRows((prev) => [...prev, { description: "", spec: "", qty: 1, rate: 0 }]);
+    setRows((prev) => [...prev, { description: "", spec: "", qty: 1, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT }]);
   }
 
   function removeRow(i: number) {
@@ -119,10 +96,11 @@ export function EstimateBuilderWithPreview({
 
   const visibleRows = rows.filter((r) => r.description.trim());
   const subtotal = visibleRows.reduce((sum, r) => sum + r.qty * r.rate, 0);
-  const gstAmount = subtotal * ((parseFloat(gstPercent) || 0) / 100);
+  const gstAmount = visibleRows.reduce((sum, r) => sum + r.qty * r.rate * ((r.gstPercent || 0) / 100), 0);
   const grandTotal = subtotal + gstAmount;
   const subsidyValue = parseFloat(subsidyEstimate) || 0;
   const netPayable = grandTotal - subsidyValue;
+  const effectiveGstPercent = subtotal > 0 ? (gstAmount / subtotal) * 100 : 0;
 
   return (
     <div>
@@ -139,31 +117,11 @@ export function EstimateBuilderWithPreview({
           />
         </div>
 
-        <input type="hidden" name="brand" value={brand} />
+        <input type="hidden" name="brand" value={primaryBrand} />
         {/* Rows can grow past any fixed guess via "+ Add item" — tell the
             server exactly how many item_N_* fields to read instead of
             silently truncating past a hardcoded count. */}
         <input type="hidden" name="itemCount" value={rows.length} />
-
-        <div className="space-y-2">
-          <p className="text-sm font-semibold">Select Solar Brand</p>
-          <div className="flex flex-wrap gap-2">
-            {SOLAR_BRANDS.map((b) => (
-              <button
-                key={b.value}
-                type="button"
-                disabled={!capacityValid}
-                className={brand === b.value ? ACTIVE_BRAND_BTN : INACTIVE_BRAND_BTN}
-                onClick={() => selectBrand(b.value, b.label)}
-              >
-                {b.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {capacityValid ? "Now select your solar brand." : "Please enter system capacity in kW first."}
-          </p>
-        </div>
 
         <div className="overflow-x-auto">
           <table className="w-full min-w-[720px] border-collapse text-sm">
@@ -171,14 +129,20 @@ export function EstimateBuilderWithPreview({
               <tr>
                 <th className="border p-1 text-left">Description</th>
                 <th className="border p-1 text-left">Specification</th>
+                <th className="border p-1 text-left">Brand</th>
                 <th className="border p-1 text-left">Qty</th>
                 <th className="border p-1 text-left">Rate (₹)</th>
+                <th className="border p-1 text-left">GST %</th>
                 <th className="border p-1 text-right">Amount</th>
+                <th className="border p-1 text-right">Incl. GST</th>
                 <th className="border p-1" />
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
+              {rows.map((row, i) => {
+                const rowAmount = row.qty * row.rate;
+                const rowGstAmount = rowAmount * ((row.gstPercent || 0) / 100);
+                return (
                 <tr key={i}>
                   <td className="border p-1">
                     <Input
@@ -193,6 +157,24 @@ export function EstimateBuilderWithPreview({
                       value={row.spec}
                       onChange={(e) => updateRow(i, "spec", e.target.value)}
                     />
+                  </td>
+                  <td className="border p-1">
+                    <Select
+                      name={`item_${i}_brand`}
+                      value={row.brand ?? ""}
+                      onValueChange={(value) => updateRow(i, "brand", value)}
+                    >
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Brand" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SOLAR_BRANDS.map((b) => (
+                          <SelectItem key={b.value} value={b.value}>
+                            {b.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </td>
                   <td className="border p-1">
                     <Input
@@ -214,8 +196,21 @@ export function EstimateBuilderWithPreview({
                       onChange={(e) => updateRow(i, "rate", e.target.value)}
                     />
                   </td>
+                  <td className="border p-1">
+                    <Input
+                      name={`item_${i}_gstPercent`}
+                      type="number"
+                      step="0.01"
+                      className="w-20"
+                      value={row.gstPercent || ""}
+                      onChange={(e) => updateRow(i, "gstPercent", e.target.value)}
+                    />
+                  </td>
                   <td className="border p-1 text-right font-mono text-muted-foreground">
-                    {row.description.trim() ? money(row.qty * row.rate) : "—"}
+                    {row.description.trim() ? money(rowAmount) : "—"}
+                  </td>
+                  <td className="border p-1 text-right font-mono text-muted-foreground">
+                    {row.description.trim() ? money(rowAmount + rowGstAmount) : "—"}
                   </td>
                   <td className="border p-1 text-center">
                     <button
@@ -228,7 +223,8 @@ export function EstimateBuilderWithPreview({
                     </button>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           <div className="mt-2 flex items-center justify-between">
@@ -246,7 +242,7 @@ export function EstimateBuilderWithPreview({
               <td className="border p-1.5 text-right font-mono">₹{money(subtotal)}</td>
             </tr>
             <tr>
-              <td className="border p-1.5 text-muted-foreground">GST ({gstPercent || 0}%)</td>
+              <td className="border p-1.5 text-muted-foreground">GST (avg {money(effectiveGstPercent)}%)</td>
               <td className="border p-1.5 text-right font-mono">₹{money(gstAmount)}</td>
             </tr>
             <tr className="bg-muted font-semibold">
@@ -268,18 +264,7 @@ export function EstimateBuilderWithPreview({
           </tbody>
         </table>
 
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="gstPercent">GST (%)</Label>
-            <Input
-              id="gstPercent"
-              name="gstPercent"
-              type="number"
-              step="0.01"
-              value={gstPercent}
-              onChange={(e) => setGstPercent(e.target.value)}
-            />
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="subsidyEstimate">Est. government subsidy (₹)</Label>
             <Input
@@ -360,14 +345,12 @@ export function EstimateBuilderWithPreview({
           <p className="text-[11px] font-bold text-[#08752f]">
             System Capacity: {capacityValid ? `${capacity} kW` : "Not selected"}
           </p>
-          <p className="text-[11px] font-bold text-[#08752f]">
-            Selected Brand: {brandLabel(brand) ?? "Not selected"}
-          </p>
 
           <table className="w-full table-fixed border-collapse text-[10px]">
             <thead>
               <tr className="bg-[#16823b] text-white">
                 <th className="border border-[#0c5b29] p-1 text-left">Description</th>
+                <th className="border border-[#0c5b29] p-1 text-left">Brand</th>
                 <th className="w-10 border border-[#0c5b29] p-1 text-right">Qty</th>
                 <th className="w-16 border border-[#0c5b29] p-1 text-right">Amount</th>
               </tr>
@@ -375,7 +358,7 @@ export function EstimateBuilderWithPreview({
             <tbody>
               {visibleRows.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="border border-[#999] p-1 text-center text-muted-foreground">
+                  <td colSpan={4} className="border border-[#999] p-1 text-center text-muted-foreground">
                     No items yet
                   </td>
                 </tr>
@@ -383,6 +366,7 @@ export function EstimateBuilderWithPreview({
                 visibleRows.map((r, i) => (
                   <tr key={i}>
                     <td className="border border-[#999] p-1 break-words">{r.description}</td>
+                    <td className="border border-[#999] p-1 break-words">{brandLabel(r.brand) ?? "—"}</td>
                     <td className="border border-[#999] p-1 text-right">{r.qty}</td>
                     <td className="border border-[#999] p-1 text-right break-words">{money(r.qty * r.rate)}</td>
                   </tr>
@@ -398,7 +382,7 @@ export function EstimateBuilderWithPreview({
                 <td className="border border-[#999] p-1 text-right break-words">₹{money(subtotal)}</td>
               </tr>
               <tr>
-                <td className="border border-[#999] bg-[#f2f7f3] p-1 font-semibold">GST ({gstPercent || 0}%)</td>
+                <td className="border border-[#999] bg-[#f2f7f3] p-1 font-semibold">GST (avg {money(effectiveGstPercent)}%)</td>
                 <td className="border border-[#999] p-1 text-right">₹{money(gstAmount)}</td>
               </tr>
               <tr className="bg-[#16823b] text-white">

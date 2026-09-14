@@ -54,8 +54,10 @@ function parseLineItemsFromForm(formData: FormData): EstimateLineItem[] {
     lineItems.push({
       description,
       spec: String(formData.get(`item_${i}_spec`) || ""),
+      brand: String(formData.get(`item_${i}_brand`) || "") || undefined,
       qty: Number(formData.get(`item_${i}_qty`) || 0),
       rate: Number(formData.get(`item_${i}_rate`) || 0),
+      gstPercent: Number(formData.get(`item_${i}_gstPercent`) || 0),
       amount: 0, // recomputed server-side
     });
   }
@@ -180,14 +182,12 @@ export async function EstimateWorkflowSection({
   async function saveFieldsAction(formData: FormData) {
     "use server";
     const systemSizeKw = formData.get("systemSizeKw");
-    const gstPercent = formData.get("gstPercent");
     const subsidyEstimate = formData.get("subsidyEstimate");
     const validUntil = formData.get("validUntil");
     await updateEstimateFields(active.id, {
       systemSizeKw: systemSizeKw ? Number(systemSizeKw) : undefined,
       brand: parseBrandFromForm(formData),
       lineItems: parseLineItemsFromForm(formData),
-      gstPercent: gstPercent ? Number(gstPercent) : undefined,
       subsidyEstimate: subsidyEstimate ? Number(subsidyEstimate) : undefined,
       validUntil: validUntil ? new Date(String(validUntil)) : undefined,
       notes: String(formData.get("notes") || "") || undefined,
@@ -288,14 +288,18 @@ export async function EstimateWorkflowSection({
           tenantEmail={tenantEmail}
           defaultValidUntil={active.validUntil ? active.validUntil.toISOString().slice(0, 10) : defaultValidUntil()}
           initialCapacity={active.systemSizeKw ? Number(active.systemSizeKw) : undefined}
-          initialBrand={(active.brand as SolarBrandValue | undefined) ?? undefined}
           initialRows={activeLineItems.map((item) => ({
             description: item.description,
             spec: item.spec ?? "",
+            // Older estimates saved before per-item brand existed fall back
+            // to the estimate's own (then-single) brand for every row.
+            brand: item.brand ?? active.brand ?? undefined,
             qty: item.qty,
             rate: item.rate,
+            // Older estimates saved before per-item GST existed fall back to
+            // the estimate's own (then-flat) GST% rather than 0.
+            gstPercent: item.gstPercent ?? Number(active.gstPercent),
           }))}
-          initialGstPercent={Number(active.gstPercent)}
           initialSubsidyEstimate={active.subsidyEstimate ? Number(active.subsidyEstimate) : undefined}
           initialNotes={active.notes ?? DEFAULT_ESTIMATE_TERMS}
           locked={locked}

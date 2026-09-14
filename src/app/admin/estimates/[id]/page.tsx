@@ -24,7 +24,6 @@ export default async function EstimatePrintPage({
   const totalAmount = Number(estimate.totalAmount);
   const subsidyEstimate = estimate.subsidyEstimate ? Number(estimate.subsidyEstimate) : null;
   const netPayable = subsidyEstimate !== null ? totalAmount - subsidyEstimate : null;
-  const selectedBrandLabel = brandLabel(estimate.brand);
   const validityDays = estimate.validUntil
     ? Math.round((estimate.validUntil.getTime() - estimate.createdAt.getTime()) / 86400000)
     : null;
@@ -92,9 +91,6 @@ export default async function EstimatePrintPage({
           <p className="font-bold text-[#08752f]">
             System Capacity: {estimate.systemSizeKw ? `${estimate.systemSizeKw} kW` : "Not Selected"}
           </p>
-          <p className="font-bold text-[#08752f]">
-            Selected Brand: {selectedBrandLabel ?? "Not Selected"}
-          </p>
         </div>
 
         <table className="mt-4 w-full border-collapse text-sm">
@@ -103,22 +99,36 @@ export default async function EstimatePrintPage({
               <th className="border border-[#0c5b29] p-2 text-left">S.No</th>
               <th className="border border-[#0c5b29] p-2 text-left">Description</th>
               <th className="border border-[#0c5b29] p-2 text-left">Specification / Details</th>
+              <th className="border border-[#0c5b29] p-2 text-left">Brand</th>
               <th className="border border-[#0c5b29] p-2 text-right">Qty</th>
               <th className="border border-[#0c5b29] p-2 text-right">Rate</th>
+              <th className="border border-[#0c5b29] p-2 text-right">GST %</th>
               <th className="border border-[#0c5b29] p-2 text-right">Amount</th>
+              <th className="border border-[#0c5b29] p-2 text-right">Incl. GST</th>
             </tr>
           </thead>
           <tbody>
-            {lineItems.map((item, i) => (
-              <tr key={i}>
-                <td className="border border-[#999] p-2">{i + 1}</td>
-                <td className="border border-[#999] p-2">{item.description}</td>
-                <td className="border border-[#999] p-2">{item.spec}</td>
-                <td className="border border-[#999] p-2 text-right">{item.qty}</td>
-                <td className="border border-[#999] p-2 text-right">{money(item.rate)}</td>
-                <td className="border border-[#999] p-2 text-right font-medium">{money(item.amount)}</td>
-              </tr>
-            ))}
+            {lineItems.map((item, i) => {
+              // Older estimates saved before per-item GST existed fall back
+              // to the estimate's own (then-flat) GST% rather than 0.
+              const itemGstPercent = item.gstPercent ?? Number(estimate.gstPercent);
+              const itemGstAmount = item.amount * (itemGstPercent / 100);
+              return (
+                <tr key={i}>
+                  <td className="border border-[#999] p-2">{i + 1}</td>
+                  <td className="border border-[#999] p-2">{item.description}</td>
+                  <td className="border border-[#999] p-2">{item.spec}</td>
+                  <td className="border border-[#999] p-2">{brandLabel(item.brand) ?? "—"}</td>
+                  <td className="border border-[#999] p-2 text-right">{item.qty}</td>
+                  <td className="border border-[#999] p-2 text-right">{money(item.rate)}</td>
+                  <td className="border border-[#999] p-2 text-right">{itemGstPercent}%</td>
+                  <td className="border border-[#999] p-2 text-right font-medium">{money(item.amount)}</td>
+                  <td className="border border-[#999] p-2 text-right font-medium">
+                    {money(item.amount + itemGstAmount)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -131,7 +141,7 @@ export default async function EstimatePrintPage({
               </tr>
               <tr>
                 <td className="border border-[#999] bg-[#f2f7f3] p-2 font-semibold">
-                  GST ({estimate.gstPercent.toString()}%)
+                  GST (avg {money(Number(estimate.gstPercent))}%)
                 </td>
                 <td className="border border-[#999] p-2 text-right">₹ {money(gstAmount)}</td>
               </tr>

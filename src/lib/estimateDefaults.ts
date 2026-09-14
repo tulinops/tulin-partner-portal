@@ -1,18 +1,32 @@
-export type EstimateBuilderRow = { description: string; spec: string; qty: number; rate: number };
+// GST is set per line item (different components can carry different GST
+// slabs in practice) rather than once for the whole estimate — the
+// estimate-level gstPercent column now stores the blended/effective rate
+// derived from these, purely for display and for older estimates saved
+// before this field existed (see the ?? fallback where line items render).
+export const DEFAULT_ITEM_GST_PERCENT = 5;
+
+export type EstimateBuilderRow = {
+  description: string;
+  spec: string;
+  brand?: string;
+  qty: number;
+  rate: number;
+  gstPercent: number;
+};
 
 // Plain data, deliberately NOT in estimate-builder-with-preview.tsx (a "use
 // client" file) — a server action importing a data export from a client
 // module gets a client-reference wrapper instead of the real value at
 // runtime, not the array itself, so .map() on it throws.
 export const DEFAULT_ESTIMATE_ROWS: EstimateBuilderRow[] = [
-  { description: "Solar PV Module", spec: "", qty: 1, rate: 0 },
-  { description: "Solar Inverter", spec: "", qty: 1, rate: 0 },
-  { description: "Solar Mounting Structure", spec: "Hot Dip Galvanized / Aluminium Structure", qty: 1, rate: 0 },
-  { description: "DC Solar Cable", spec: "UV Resistant DC Solar Cable", qty: 1, rate: 0 },
-  { description: "AC Cable", spec: "Copper / Aluminium AC Cable", qty: 1, rate: 0 },
-  { description: "MC4 Connectors", spec: "Original Compatible MC4 Connectors", qty: 4, rate: 0 },
-  { description: "Earthing & Lightning Protection", spec: "Complete Earthing & Lightning Protection System", qty: 1, rate: 0 },
-  { description: "Installation & Commissioning", spec: "Complete Solar System Installation & Commissioning", qty: 1, rate: 0 },
+  { description: "Solar PV Module", spec: "", qty: 1, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT },
+  { description: "Solar Inverter", spec: "", qty: 1, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT },
+  { description: "Solar Mounting Structure", spec: "Hot Dip Galvanized / Aluminium Structure", qty: 1, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT },
+  { description: "DC Solar Cable", spec: "UV Resistant DC Solar Cable", qty: 1, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT },
+  { description: "AC Cable", spec: "Copper / Aluminium AC Cable", qty: 1, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT },
+  { description: "MC4 Connectors", spec: "Original Compatible MC4 Connectors", qty: 4, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT },
+  { description: "Earthing & Lightning Protection", spec: "Complete Earthing & Lightning Protection System", qty: 1, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT },
+  { description: "Installation & Commissioning", spec: "Complete Solar System Installation & Commissioning", qty: 1, rate: 0, gstPercent: DEFAULT_ITEM_GST_PERCENT },
 ];
 
 // Shared between the create-estimate form (as defaultValue) and the print
