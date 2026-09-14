@@ -3,7 +3,7 @@ import { listLeads, createLead } from "@/server/leads";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge, LEAD_STAGE_TONE } from "@/components/status-badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const SOURCES = ["INSTAGRAM", "FACEBOOK", "WHATSAPP", "REFERRAL", "OTHER"] as const;
 
@@ -44,7 +45,7 @@ export default async function LeadsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-extrabold">Leads</h1>
+      <PageHeader breadcrumbs={[{ label: "Leads" }]} title="Leads" />
 
       <Card>
         <CardHeader>
@@ -122,9 +123,7 @@ export default async function LeadsPage() {
               <TableCell>{lead.email ?? "—"}</TableCell>
               <TableCell>{lead.source}</TableCell>
               <TableCell>
-                <Badge variant={lead.stage === "WON" ? "default" : lead.stage === "LOST" ? "destructive" : "secondary"}>
-                  {lead.stage.replace("_", " ")}
-                </Badge>
+                <StatusBadge tone={LEAD_STAGE_TONE[lead.stage]} label={lead.stage.replace("_", " ")} />
               </TableCell>
               <TableCell>{lead.estimatedValue?.toString() ?? "—"}</TableCell>
               <TableCell>

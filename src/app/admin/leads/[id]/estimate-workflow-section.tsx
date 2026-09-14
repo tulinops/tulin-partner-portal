@@ -17,6 +17,7 @@ import { isEstimateLocked, STAGE_ORDER, type ConnectionStageKey } from "@/lib/co
 import type { EstimateStatus } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import {
   Select,
   SelectContent,
@@ -40,6 +41,14 @@ const STATUS_LABELS: Record<string, string> = {
   LOCKED: "Locked",
 };
 const SELECTABLE_STATUSES = ["DRAFT", "SENT", "ACCEPTED", "REJECTED", "LOCKED"] as const;
+
+const ESTIMATE_STATUS_TONE: Record<EstimateStatus, StatusTone> = {
+  DRAFT: "neutral",
+  SENT: "progress",
+  ACCEPTED: "done",
+  REJECTED: "cancel",
+  LOCKED: "amber",
+};
 
 function defaultValidUntil() {
   return new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -219,7 +228,7 @@ export async function EstimateWorkflowSection({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-mono text-xs text-muted-foreground">{active.estimateNumber}</span>
-          <Badge variant={active.isCurrent ? "default" : "secondary"}>{STATUS_LABELS[active.status] ?? active.status}</Badge>
+          <StatusBadge tone={ESTIMATE_STATUS_TONE[active.status]} label={STATUS_LABELS[active.status] ?? active.status} />
           {locked && <Badge variant="outline">Locked</Badge>}
         </div>
         <div className="flex flex-wrap gap-2">

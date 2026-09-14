@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   listRequiredDocumentTypes,
   createRequiredDocumentType,
@@ -7,8 +6,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   Table,
   TableBody,
@@ -39,16 +39,11 @@ export default async function RequiredDocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-extrabold">Required documents</h1>
-        <p className="text-sm text-muted-foreground">
-          The checklist every customer&apos;s connection is verified against. Add or retire document types here — it
-          applies to every connection automatically.{" "}
-          <Link href="/admin/settings" className="underline underline-offset-4">
-            ← Back to Business Profile
-          </Link>
-        </p>
-      </div>
+      <PageHeader
+        breadcrumbs={[{ label: "Business Profile", href: "/admin/settings" }, { label: "Required documents" }]}
+        title="Required documents"
+        description="The checklist every customer's connection is verified against. Add or retire document types here — it applies to every connection automatically."
+      />
 
       <Card>
         <CardHeader>
@@ -91,7 +86,7 @@ export default async function RequiredDocumentsPage() {
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell className="text-muted-foreground">{t.description ?? "—"}</TableCell>
                   <TableCell>
-                    <Badge variant={t.isActive ? "default" : "secondary"}>{t.isActive ? "Active" : "Retired"}</Badge>
+                    <StatusBadge tone={t.isActive ? "done" : "neutral"} label={t.isActive ? "Active" : "Retired"} />
                   </TableCell>
                   <TableCell>
                     <form action={toggleActiveAction}>

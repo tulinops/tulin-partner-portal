@@ -1,5 +1,6 @@
 import { getDashboardTotals } from "@/server/finance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 function formatMoney(n: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
@@ -14,7 +15,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-extrabold">Dashboard</h1>
+      <PageHeader breadcrumbs={[{ label: "Dashboard" }]} title="Dashboard" />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>

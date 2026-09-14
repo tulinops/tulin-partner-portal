@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listConnections } from "@/server/connections";
 import { ConnectionStatusBadge } from "@/components/status-badge";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   Table,
   TableBody,
@@ -15,10 +16,11 @@ export default async function ConnectionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-extrabold">Connections</h1>
-      <p className="text-sm text-muted-foreground">
-        Won leads convert into connections from the lead detail page.
-      </p>
+      <PageHeader
+        breadcrumbs={[{ label: "Connections" }]}
+        title="Connections"
+        description="Won leads convert into connections from the lead detail page."
+      />
 
       <Table>
         <TableHeader>

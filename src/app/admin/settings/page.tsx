@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export default async function BusinessProfilePage() {
   const tenant = await getBusinessProfile();
@@ -21,10 +22,11 @@ export default async function BusinessProfilePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-extrabold">Business Profile</h1>
-      <p className="text-sm text-muted-foreground">
-        This appears on the letterhead of every printed estimate.
-      </p>
+      <PageHeader
+        breadcrumbs={[{ label: "Business Profile" }]}
+        title="Business Profile"
+        description="This appears on the letterhead of every printed estimate."
+      />
 
       <Card>
         <CardHeader>

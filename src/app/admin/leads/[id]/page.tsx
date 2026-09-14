@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge, LEAD_STAGE_TONE } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EstimateWorkflowSection } from "./estimate-workflow-section";
 import { CustomerTabs } from "@/app/admin/connections/[id]/customer-tabs";
 import { getBusinessProfile } from "@/server/business-profile";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const NOT_YET_A_CUSTOMER = (
   <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -206,30 +207,31 @@ export default async function LeadDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="font-heading text-xs font-semibold tracking-wide text-primary uppercase">
-            Lead #{lead.id.slice(-6).toUpperCase()}
-          </p>
-          <h1 className="font-heading text-2xl font-extrabold">{lead.customerName}</h1>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+      <PageHeader
+        breadcrumbs={[{ label: "Leads", href: "/admin/leads" }, { label: lead.customerName }]}
+        eyebrow={`Lead #${lead.id.slice(-6).toUpperCase()}`}
+        title={lead.customerName}
+        description={
+          <>
             <span className="font-mono font-semibold text-foreground">{lead.phone}</span>
             <span>
               Source: <span className="font-semibold text-foreground">{lead.source}</span>
             </span>
             {lead.email && <span>{lead.email}</span>}
-          </div>
-        </div>
-        {lead.connection ? (
-          <Link href={`/admin/connections/${lead.connection.id}`}>
-            <Button variant="outline" size="sm">
-              View customer →
-            </Button>
-          </Link>
-        ) : (
-          <Badge variant={lead.stage === "LOST" ? "destructive" : "secondary"}>{lead.stage.replace("_", " ")}</Badge>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          lead.connection ? (
+            <Link href={`/admin/connections/${lead.connection.id}`}>
+              <Button variant="outline" size="sm">
+                View customer →
+              </Button>
+            </Link>
+          ) : (
+            <StatusBadge tone={LEAD_STAGE_TONE[lead.stage]} label={lead.stage.replace("_", " ")} />
+          )
+        }
+      />
 
       <CustomerTabs
         currentStage={stage}

@@ -1,6 +1,6 @@
 import { listTenantsWithCounts, createTenant } from "@/server/tenants";
 import type { BusinessType } from "@/generated/prisma/enums";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CreateTenantForm } from "./create-tenant-form";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 async function createTenantAction(
   _prevState: { tempPassword?: string; adminEmail?: string; error?: string } | null,
@@ -36,7 +37,7 @@ export default async function TenantsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-extrabold">Tenants</h1>
+      <PageHeader breadcrumbs={[{ label: "Tenants" }]} title="Tenants" />
       <p className="text-sm text-muted-foreground">
         Metadata only — tenant business data (leads, inventory, finance) is private to each tenant
         and never shown here.
@@ -67,9 +68,7 @@ export default async function TenantsPage() {
               <TableCell className="font-medium">{t.name}</TableCell>
               <TableCell>{t.businessType}</TableCell>
               <TableCell>
-                <Badge variant={t.isActive ? "default" : "destructive"}>
-                  {t.isActive ? "Active" : "Suspended"}
-                </Badge>
+                <StatusBadge tone={t.isActive ? "done" : "cancel"} label={t.isActive ? "Active" : "Suspended"} />
               </TableCell>
               <TableCell>{t._count.leads}</TableCell>
               <TableCell>{t._count.connections}</TableCell>

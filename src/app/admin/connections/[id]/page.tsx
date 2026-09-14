@@ -54,7 +54,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge, CONNECTION_STATUS_TONE } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   Select,
   SelectContent,
@@ -1602,23 +1604,20 @@ export default async function ConnectionDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="font-heading text-xs font-semibold tracking-wide text-primary uppercase">
-            Customer #{connection.id.slice(-6).toUpperCase()}
-          </p>
-          <h1 className="font-heading text-2xl font-extrabold">{connection.customerName}</h1>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+      <PageHeader
+        breadcrumbs={[{ label: "Connections", href: "/admin/connections" }, { label: connection.customerName }]}
+        eyebrow={`Customer #${connection.id.slice(-6).toUpperCase()}`}
+        title={connection.customerName}
+        description={
+          <>
             <span className="font-mono font-semibold text-foreground">{connection.phone}</span>
             <span>
               Lead source: <span className="font-semibold text-foreground">{connection.lead.source}</span>
             </span>
-          </div>
-        </div>
-        <Badge variant={connection.status === "CANCELLED" ? "destructive" : connection.status === "COMPLETED" ? "default" : "secondary"}>
-          {STAGE_LABELS[stage]}
-        </Badge>
-      </div>
+          </>
+        }
+        actions={<StatusBadge tone={CONNECTION_STATUS_TONE[connection.status]} label={STAGE_LABELS[stage]} />}
+      />
 
       <CustomerTabs
         currentStage={stage}

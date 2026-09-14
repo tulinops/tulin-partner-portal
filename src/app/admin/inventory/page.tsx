@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   Select,
   SelectContent,
@@ -43,7 +44,7 @@ export default async function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-extrabold">Inventory</h1>
+      <PageHeader breadcrumbs={[{ label: "Inventory" }]} title="Inventory" />
 
       <Card>
         <CardHeader>

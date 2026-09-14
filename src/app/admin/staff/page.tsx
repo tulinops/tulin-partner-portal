@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/components/layout/PageHeader";
 import {
   Table,
   TableBody,
@@ -25,10 +26,11 @@ export default async function StaffPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-extrabold">Staff</h1>
-      <p className="text-sm text-muted-foreground">
-        Workers you assign to site visits and installations. No login access — this is just a name/phone record.
-      </p>
+      <PageHeader
+        breadcrumbs={[{ label: "Staff" }]}
+        title="Staff"
+        description="Workers you assign to site visits and installations. No login access — this is just a name/phone record."
+      />
 
       <Card>
         <CardHeader>
