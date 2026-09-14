@@ -5,7 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EQUIPMENT_TYPES } from "@/lib/installationEquipment";
+import { SOLAR_BRANDS } from "@/lib/estimateBrands";
 import type { InstalledEquipmentItem } from "@/server/connections";
+
+const BRAND_SUGGESTIONS_ID = "installed-equipment-brand-suggestions";
 
 export function InstalledEquipmentEditor({ initialItems }: { initialItems: InstalledEquipmentItem[] }) {
   const [rows, setRows] = useState<InstalledEquipmentItem[]>(initialItems);
@@ -53,6 +56,7 @@ export function InstalledEquipmentEditor({ initialItems }: { initialItems: Insta
             placeholder="Brand"
             value={row.brand ?? ""}
             onChange={(e) => updateRow(i, "brand", e.target.value)}
+            list={BRAND_SUGGESTIONS_ID}
           />
           <Input
             name={`equip_${i}_model`}
@@ -86,6 +90,15 @@ export function InstalledEquipmentEditor({ initialItems }: { initialItems: Insta
       <Button type="button" variant="outline" size="sm" onClick={addRow}>
         + Add item
       </Button>
+      {/* Suggestions only, not a restriction — the Brand field stays plain
+          text so equipment from a brand outside this curated solar-panel
+          list (mounting hardware, cabling, connectors, etc.) can still be
+          typed in freely. */}
+      <datalist id={BRAND_SUGGESTIONS_ID}>
+        {SOLAR_BRANDS.map((b) => (
+          <option key={b.value} value={b.label} />
+        ))}
+      </datalist>
     </div>
   );
 }
