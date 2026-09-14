@@ -709,7 +709,11 @@ export default async function ConnectionDetailPage({
           <form action={propertyInspectionAction} className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="roofType">Roof type</Label>
-              <Select name="roofType" defaultValue={inspection.roofType ?? undefined}>
+              <Select
+                key={connection.updatedAt.getTime()}
+                name="roofType"
+                defaultValue={inspection.roofType ?? undefined}
+              >
                 <SelectTrigger id="roofType">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -724,7 +728,11 @@ export default async function ConnectionDetailPage({
             </div>
             <div className="space-y-2">
               <Label htmlFor="roofCondition">Roof condition</Label>
-              <Select name="roofCondition" defaultValue={inspection.roofCondition ?? undefined}>
+              <Select
+                key={connection.updatedAt.getTime()}
+                name="roofCondition"
+                defaultValue={inspection.roofCondition ?? undefined}
+              >
                 <SelectTrigger id="roofCondition">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -757,7 +765,11 @@ export default async function ConnectionDetailPage({
             </div>
             <div className="space-y-2">
               <Label htmlFor="roofAccess">Access to roof</Label>
-              <Select name="roofAccess" defaultValue={inspection.roofAccess ?? undefined}>
+              <Select
+                key={connection.updatedAt.getTime()}
+                name="roofAccess"
+                defaultValue={inspection.roofAccess ?? undefined}
+              >
                 <SelectTrigger id="roofAccess">
                   <SelectValue placeholder="Select" />
                 </SelectTrigger>
@@ -980,7 +992,15 @@ export default async function ConnectionDetailPage({
           <form action={financingMethodAction} className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
               <Label htmlFor="financingMethod">Financing method</Label>
-              <Select name="financingMethod" defaultValue={connection.financingMethod}>
+              {/* Keyed for the same reason as the other status dropdowns on
+                  this page — forces a remount/re-sync with the true saved
+                  value on every render instead of trusting an uncontrolled
+                  Select to keep itself in sync after a save. */}
+              <Select
+                key={connection.updatedAt.getTime()}
+                name="financingMethod"
+                defaultValue={connection.financingMethod}
+              >
                 <SelectTrigger id="financingMethod" className="w-64">
                   <SelectValue />
                 </SelectTrigger>
@@ -1013,7 +1033,11 @@ export default async function ConnectionDetailPage({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="subsidyStatus">Status</Label>
-                <Select name="subsidyStatus" defaultValue={connection.subsidyStatus}>
+                <Select
+                  key={connection.updatedAt.getTime()}
+                  name="subsidyStatus"
+                  defaultValue={connection.subsidyStatus}
+                >
                   <SelectTrigger id="subsidyStatus">
                     <SelectValue />
                   </SelectTrigger>
