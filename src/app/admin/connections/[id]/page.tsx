@@ -31,7 +31,7 @@ import { getBusinessProfile } from "@/server/business-profile";
 import { SitePhotos } from "./site-photos";
 import { CustomerTabs } from "./customer-tabs";
 import { EstimateWorkflowSection } from "@/app/admin/leads/[id]/estimate-workflow-section";
-import { STAGE_LABELS } from "@/lib/connectionStage";
+import { STAGE_LABELS, STAGE_ORDER } from "@/lib/connectionStage";
 import type {
   SiteVisitStatus,
   SiteVisitResult,
@@ -820,18 +820,23 @@ export default async function ConnectionDetailPage({
     </Card>
   );
 
+  const subsidyLoanReached = STAGE_ORDER.indexOf(stage) >= STAGE_ORDER.indexOf("subsidyloan");
   const subsidyLoanSection = (
     <div className="space-y-6">
       <div
         className={
-          stage === "subsidyloan"
+          !subsidyLoanReached
             ? "rounded-md bg-amber-100 p-3 text-sm font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
-            : "rounded-md bg-primary/10 p-3 text-sm font-medium text-primary"
+            : stage === "subsidyloan"
+              ? "rounded-md bg-amber-100 p-3 text-sm font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+              : "rounded-md bg-primary/10 p-3 text-sm font-medium text-primary"
         }
       >
-        {stage === "subsidyloan"
-          ? 'Financing isn\'t settled yet — set the subsidy status to "Disbursed", or the loan status to "Completed", to move this customer to Installation.'
-          : "Financing settled — this customer has moved to Installation."}
+        {!subsidyLoanReached
+          ? `This customer hasn't reached Subsidy / Loan yet — the current stage is still "${STAGE_LABELS[stage]}". Anything saved here is kept, but won't count as progress until that catches up.`
+          : stage === "subsidyloan"
+            ? 'Financing isn\'t settled yet — set the subsidy status to "Disbursed", or the loan status to "Completed", to move this customer to Installation.'
+            : "Financing settled — this customer has moved to Installation."}
       </div>
       <Card>
         <CardHeader>
