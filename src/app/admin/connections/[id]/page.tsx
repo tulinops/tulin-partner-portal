@@ -160,6 +160,10 @@ function dateInputValue(d: Date | null | undefined) {
   return d ? d.toISOString().slice(0, 10) : "";
 }
 
+function isImageFile(path: string) {
+  return /\.(jpe?g|png|gif|webp|bmp|avif)$/i.test(path);
+}
+
 export default async function ConnectionDetailPage({
   params,
   searchParams,
@@ -882,6 +886,16 @@ export default async function ConnectionDetailPage({
                 </Button>
               </div>
             </form>
+            {doc.filePath && isImageFile(doc.filePath) && (
+              <a href={`/${doc.filePath}`} target="_blank" rel="noreferrer" className="inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element -- local static upload, not an optimizable remote asset */}
+                <img
+                  src={`/${doc.filePath}`}
+                  alt={doc.originalName ?? "Uploaded document"}
+                  className="h-20 w-20 rounded border object-cover"
+                />
+              </a>
+            )}
             <form action={uploadDocumentAction} className="flex flex-wrap items-center gap-2 text-sm">
               <input type="hidden" name="connectionDocumentId" value={doc.id} />
               <input type="file" name="file" accept="image/*,application/pdf" required className="text-xs" />
@@ -895,7 +909,8 @@ export default async function ConnectionDetailPage({
                   rel="noreferrer"
                   className="text-xs text-muted-foreground underline underline-offset-4"
                 >
-                  View current file{doc.originalName ? ` (${doc.originalName})` : ""}
+                  {isImageFile(doc.filePath) ? "View full size" : "View current file"}
+                  {doc.originalName ? ` (${doc.originalName})` : ""}
                 </a>
               )}
             </form>
