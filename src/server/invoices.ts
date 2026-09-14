@@ -40,7 +40,10 @@ async function generateInvoiceNumber(tenantSlug: string) {
     String(now.getHours()).padStart(2, "0") +
     String(now.getMinutes()).padStart(2, "0") +
     String(now.getSeconds()).padStart(2, "0");
-  return `${tenantSlug.toUpperCase()}/INV/${fiscalYear}/${stamp}`;
+  // Same collision risk as generateEstimateNumber (src/server/leads.ts) — the
+  // stamp is only second-granular against a globally-unique field.
+  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${tenantSlug.toUpperCase()}/INV/${fiscalYear}/${stamp}${suffix}`;
 }
 
 // Line items are seeded from what was actually installed, not the original

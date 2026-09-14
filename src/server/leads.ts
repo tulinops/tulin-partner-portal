@@ -204,7 +204,13 @@ async function generateEstimateNumber(tenantSlug: string) {
     String(now.getHours()).padStart(2, "0") +
     String(now.getMinutes()).padStart(2, "0") +
     String(now.getSeconds()).padStart(2, "0");
-  return `${tenantSlug.toUpperCase()}/${fiscalYear}/${stamp}`;
+  // estimateNumber is globally unique, but the stamp above is only
+  // second-granular — two quotes created for the same tenant within the same
+  // second (e.g. building a comparison quote right after the first) would
+  // otherwise collide on Estimate_estimateNumber_key. The random suffix keeps
+  // the number unique without needing a DB round trip or retry loop.
+  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `${tenantSlug.toUpperCase()}/${fiscalYear}/${stamp}${suffix}`;
 }
 
 export async function createEstimate(input: {
