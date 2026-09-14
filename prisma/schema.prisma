@@ -43,6 +43,7 @@ model Tenant {
   connectionDocuments   ConnectionDocument[]
   loanApplications      LoanApplication[]
   warrantyRecords       WarrantyRecord[]
+  invoices              Invoice[]
 }
 
 enum Role {
@@ -375,6 +376,11 @@ model Connection {
   // dashboard that's much easier against real columns than a JSON blob.
   warrantyRecords WarrantyRecord[]
 
+  // One invoice per connection — generated on demand (not automatically),
+  // seeded from installedEquipment so it reflects what was actually
+  // installed, then freely editable.
+  invoice Invoice?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -475,6 +481,32 @@ model WarrantyRecord {
 
   // No stored expiry date — computed at read time (startDate + periodMonths),
   // same convention already used for Connection's profit figure.
+
+  @@index([tenantId, connectionId])
+}
+
+model Invoice {
+  id           String     @id @default(cuid())
+  tenantId     String
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  connectionId String     @unique
+  connection   Connection @relation(fields: [connectionId], references: [id])
+
+  invoiceNumber String   @unique // generated once at creation, stable across reprints
+  invoiceDate   DateTime @default(now())
+  // {description, spec?, qty, rate, amount}[] — same shape/rationale as
+  // Estimate.lineItems, but seeded from the connection's actual
+  // installedEquipment rather than the original quotation, since on-site
+  // extras beyond what was quoted are common and the invoice must reflect
+  // what was really installed.
+  lineItems   Json
+  subtotal    Decimal  @db.Decimal(12, 2)
+  gstPercent  Decimal  @default(0) @db.Decimal(5, 2)
+  gstAmount   Decimal  @default(0) @db.Decimal(12, 2)
+  totalAmount Decimal  @db.Decimal(12, 2)
+  notes       String? // terms & conditions shown on the printed invoice
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([tenantId, connectionId])
 }

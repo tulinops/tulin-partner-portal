@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { cn } from "cn";
 import { STAGE_ORDER, STAGE_LABELS, type ConnectionStageKey } from "@/lib/connectionStage";
 
-type TabKey = Exclude<ConnectionStageKey, "completed"> | "overview" | "activity";
+type TabKey = Exclude<ConnectionStageKey, "completed"> | "overview" | "activity" | "invoice";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Overview" },
@@ -14,6 +14,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: "documents", label: "Documents" },
   { key: "subsidyloan", label: "Payments" },
   { key: "installation", label: "Installation" },
+  { key: "invoice", label: "Invoice" },
   { key: "warranty", label: "Warranty" },
   { key: "activity", label: "Activity / Notes" },
 ];
@@ -27,6 +28,7 @@ export function CustomerTabs({
   documents,
   subsidyloan,
   installation,
+  invoice,
   warranty,
   activity,
 }: {
@@ -38,6 +40,7 @@ export function CustomerTabs({
   documents: ReactNode;
   subsidyloan: ReactNode;
   installation: ReactNode;
+  invoice: ReactNode;
   warranty: ReactNode;
   activity: ReactNode;
 }) {
@@ -53,6 +56,7 @@ export function CustomerTabs({
     documents,
     subsidyloan,
     installation,
+    invoice,
     warranty,
     activity,
   };

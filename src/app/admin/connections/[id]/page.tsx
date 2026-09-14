@@ -33,6 +33,8 @@ import { InstalledEquipmentEditor } from "./installed-equipment-editor";
 import { WarrantyRecordForm } from "./warranty-record-form";
 import { AddWarrantyDialog } from "./add-warranty-dialog";
 import { WarrantyRecordView } from "./warranty-record-view";
+import { InvoiceItemsEditor } from "./invoice-items-editor";
+import { generateInvoice, updateInvoice, type InvoiceLineItem } from "@/server/invoices";
 import { EstimateWorkflowSection } from "@/app/admin/leads/[id]/estimate-workflow-section";
 import { STAGE_LABELS, STAGE_ORDER } from "@/lib/connectionStage";
 import { buildEquipmentFromEstimateLineItems } from "@/lib/installationEquipment";
@@ -122,6 +124,27 @@ const INSTALLATION_STATUSES = [
 // Fallback only — the form always sends the real row count via a hidden
 // "equipCount" field, since "+ Add item" can push rows past any fixed guess.
 const EQUIPMENT_ROW_COUNT_FALLBACK = 20;
+
+// Same fallback pattern as EQUIPMENT_ROW_COUNT_FALLBACK, for the Invoice
+// items editor's own hidden "itemCount" field.
+const INVOICE_ROW_COUNT_FALLBACK = 20;
+
+function parseInvoiceLineItemsFromForm(formData: FormData): InvoiceLineItem[] {
+  const rowCount = Number(formData.get("itemCount")) || INVOICE_ROW_COUNT_FALLBACK;
+  const items: InvoiceLineItem[] = [];
+  for (let i = 0; i < rowCount; i++) {
+    const description = String(formData.get(`item_${i}_description`) || "");
+    if (!description.trim()) continue;
+    items.push({
+      description,
+      spec: String(formData.get(`item_${i}_spec`) || ""),
+      qty: Number(formData.get(`item_${i}_qty`) || 0),
+      rate: Number(formData.get(`item_${i}_rate`) || 0),
+      amount: 0, // recomputed server-side
+    });
+  }
+  return items;
+}
 
 function datetimeLocalValue(d: Date | null | undefined) {
   return d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
@@ -333,6 +356,23 @@ export default async function ConnectionDetailPage({
       connectionId: id,
       signedOffByName: String(formData.get("signedOffByName")),
       notes: String(formData.get("installationNotes") || "") || undefined,
+    });
+  }
+
+  async function generateInvoiceAction() {
+    "use server";
+    await generateInvoice(id);
+  }
+
+  async function updateInvoiceAction(formData: FormData) {
+    "use server";
+    if (!connection.invoice) return;
+    const invoiceDate = formData.get("invoiceDate");
+    await updateInvoice(connection.invoice.id, {
+      lineItems: parseInvoiceLineItemsFromForm(formData),
+      gstPercent: Number(formData.get("gstPercent") || 0),
+      invoiceDate: invoiceDate ? new Date(String(invoiceDate)) : undefined,
+      notes: String(formData.get("notes") || "") || undefined,
     });
   }
 
@@ -1302,6 +1342,60 @@ export default async function ConnectionDetailPage({
     </div>
   );
 
+  const invoiceLineItems = (connection.invoice?.lineItems as unknown as InvoiceLineItem[] | null) ?? [];
+  const invoiceSection = (
+    <Card>
+      <CardHeader>
+        <CardTitle>Invoice</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!connection.invoice ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              No invoice yet. Generating one copies the customer&apos;s actual installed equipment into a billable
+              invoice — not the original quotation — so it reflects anything added on-site. It&apos;s fully
+              editable afterward.
+            </p>
+            <form action={generateInvoiceAction}>
+              <Button type="submit">Generate invoice</Button>
+            </form>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="font-mono text-muted-foreground">{connection.invoice.invoiceNumber}</span>
+              <Link href={`/admin/invoices/${connection.invoice.id}`} target="_blank">
+                <Button type="button" variant="outline" size="sm">
+                  View / Print →
+                </Button>
+              </Link>
+            </div>
+            <form action={updateInvoiceAction} className="space-y-4">
+              <div className="space-y-2 sm:w-64">
+                <Label htmlFor="invoiceDate">Invoice date</Label>
+                <Input
+                  id="invoiceDate"
+                  name="invoiceDate"
+                  type="date"
+                  defaultValue={connection.invoice.invoiceDate.toISOString().slice(0, 10)}
+                />
+              </div>
+              <InvoiceItemsEditor
+                initialItems={invoiceLineItems}
+                initialGstPercent={Number(connection.invoice.gstPercent)}
+              />
+              <div className="space-y-2">
+                <Label htmlFor="notes">Terms &amp; conditions</Label>
+                <Textarea id="notes" name="notes" defaultValue={connection.invoice.notes ?? ""} rows={6} />
+              </div>
+              <Button type="submit">Save changes</Button>
+            </form>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   const warrantySection = (
     <Card>
       <CardHeader>
@@ -1432,6 +1526,7 @@ export default async function ConnectionDetailPage({
         documents={documentsSection}
         subsidyloan={subsidyLoanSection}
         installation={installationSection}
+        invoice={invoiceSection}
         warranty={warrantySection}
         activity={activitySection}
       />

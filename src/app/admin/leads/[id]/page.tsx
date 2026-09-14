@@ -266,6 +266,7 @@ export default async function LeadDetailPage({
         documents={NOT_YET_A_CUSTOMER}
         subsidyloan={NOT_YET_A_CUSTOMER}
         installation={NOT_YET_A_CUSTOMER}
+        invoice={NOT_YET_A_CUSTOMER}
         warranty={NOT_YET_A_CUSTOMER}
         activity={activitySection}
       />

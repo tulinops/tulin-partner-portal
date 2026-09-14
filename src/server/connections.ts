@@ -79,6 +79,7 @@ export async function getConnectionDetail(connectionId: string) {
       },
       loanApplications: { orderBy: { createdAt: "desc" } },
       warrantyRecords: { orderBy: { createdAt: "asc" } },
+      invoice: true,
     },
   });
   if (!connection) return null;
