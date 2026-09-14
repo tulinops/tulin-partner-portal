@@ -959,7 +959,9 @@ export default async function ConnectionDetailPage({
         {!subsidyLoanReached
           ? `This customer hasn't reached Payments yet — the current stage is still "${STAGE_LABELS[stage]}". Anything saved here is kept, but won't count as progress until that catches up.`
           : stage === "subsidyloan"
-            ? 'Financing isn\'t settled yet — set the subsidy status to "Disbursed", or the loan status to "Completed", to move this customer to Installation.'
+            ? connection.financingMethod === "LOAN"
+              ? 'Financing isn\'t settled yet — set the loan status to "Completed" below to move this customer to Installation.'
+              : 'Financing isn\'t settled yet — set the subsidy status to "Disbursed" below to move this customer to Installation. (Only the Bank loan financing method has a "Completed" status — full-payment customers settle at "Disbursed".)'
             : "Financing settled — this customer has moved to Installation."}
       </div>
 
