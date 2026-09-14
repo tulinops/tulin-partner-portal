@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import {
   getConnectionDetail,
   recordPayment,
-  updateConnectionStatus,
   assignSiteVisit,
   updateSiteVisitStatus,
   recordSiteInspectionDetails,
@@ -181,18 +180,6 @@ export default async function ConnectionDetailPage({
       connectionId: id,
       amount: Number(formData.get("amount")),
       note: String(formData.get("note") || "") || undefined,
-    });
-  }
-
-  // Status only ever advances as a byproduct of real progress on the Site
-  // Visit / Subsidy-Loan / Installation tabs (see updateConnectionStatus's
-  // callers) — Overview can change who's assigned, not jump the stage.
-  async function updateInstallerAction(formData: FormData) {
-    "use server";
-    await updateConnectionStatus({
-      connectionId: id,
-      status: connection.status,
-      assignedInstaller: String(formData.get("assignedInstaller") || "") || undefined,
     });
   }
 
@@ -499,36 +486,6 @@ export default async function ConnectionDetailPage({
           <CardContent className="font-mono text-xl font-semibold">{money(profit)}</CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Status &amp; installer</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 space-y-1">
-            <p className="text-sm text-muted-foreground">Status</p>
-            <p className="text-sm font-medium">
-              {connection.status.replace(/_/g, " ")}
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                (advances automatically from the Site Visit / Payments / Installation tabs)
-              </span>
-            </p>
-          </div>
-          <form action={updateInstallerAction} className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="assignedInstaller">Assigned installer</Label>
-              <Input
-                id="assignedInstaller"
-                name="assignedInstaller"
-                defaultValue={connection.assignedInstaller ?? ""}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit">Update</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
     </div>
   );
 
