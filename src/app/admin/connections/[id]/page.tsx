@@ -138,8 +138,10 @@ function parseInvoiceLineItemsFromForm(formData: FormData): InvoiceLineItem[] {
     items.push({
       description,
       spec: String(formData.get(`item_${i}_spec`) || ""),
+      brand: String(formData.get(`item_${i}_brand`) || "") || undefined,
       qty: Number(formData.get(`item_${i}_qty`) || 0),
       rate: Number(formData.get(`item_${i}_rate`) || 0),
+      gstPercent: Number(formData.get(`item_${i}_gstPercent`) || 0),
       amount: 0, // recomputed server-side
     });
   }
@@ -370,7 +372,6 @@ export default async function ConnectionDetailPage({
     const invoiceDate = formData.get("invoiceDate");
     await updateInvoice(connection.invoice.id, {
       lineItems: parseInvoiceLineItemsFromForm(formData),
-      gstPercent: Number(formData.get("gstPercent") || 0),
       invoiceDate: invoiceDate ? new Date(String(invoiceDate)) : undefined,
       notes: String(formData.get("notes") || "") || undefined,
     });
@@ -1342,7 +1343,14 @@ export default async function ConnectionDetailPage({
     </div>
   );
 
-  const invoiceLineItems = (connection.invoice?.lineItems as unknown as InvoiceLineItem[] | null) ?? [];
+  const invoiceLineItems = (
+    (connection.invoice?.lineItems as unknown as InvoiceLineItem[] | null) ?? []
+  ).map((item) => ({
+    ...item,
+    // Older invoices saved before per-item GST existed fall back to the
+    // invoice's own (then-flat) GST% rather than 0.
+    gstPercent: item.gstPercent ?? Number(connection.invoice?.gstPercent ?? 0),
+  }));
   const invoiceSection = (
     <Card>
       <CardHeader>
@@ -1380,10 +1388,7 @@ export default async function ConnectionDetailPage({
                   defaultValue={connection.invoice.invoiceDate.toISOString().slice(0, 10)}
                 />
               </div>
-              <InvoiceItemsEditor
-                initialItems={invoiceLineItems}
-                initialGstPercent={Number(connection.invoice.gstPercent)}
-              />
+              <InvoiceItemsEditor initialItems={invoiceLineItems} />
               <div className="space-y-2">
                 <Label htmlFor="notes">Terms &amp; conditions</Label>
                 <Textarea id="notes" name="notes" defaultValue={connection.invoice.notes ?? ""} rows={6} />

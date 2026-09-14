@@ -3,6 +3,7 @@ import { getInvoice } from "@/server/invoices";
 import type { InvoiceLineItem } from "@/server/invoices";
 import { amountInWords } from "@/lib/amountInWords";
 import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
+import { brandLabel } from "@/lib/estimateBrands";
 import { PrintButton } from "@/components/print-button";
 
 function money(n: number) {
@@ -85,22 +86,36 @@ export default async function InvoicePrintPage({
               <th className="border border-[#0c5b29] p-2 text-left">S.No</th>
               <th className="border border-[#0c5b29] p-2 text-left">Description</th>
               <th className="border border-[#0c5b29] p-2 text-left">Specification / Details</th>
+              <th className="border border-[#0c5b29] p-2 text-left">Brand</th>
               <th className="border border-[#0c5b29] p-2 text-right">Qty</th>
               <th className="border border-[#0c5b29] p-2 text-right">Rate</th>
+              <th className="border border-[#0c5b29] p-2 text-right">GST %</th>
               <th className="border border-[#0c5b29] p-2 text-right">Amount</th>
+              <th className="border border-[#0c5b29] p-2 text-right">Incl. GST</th>
             </tr>
           </thead>
           <tbody>
-            {lineItems.map((item, i) => (
-              <tr key={i}>
-                <td className="border border-[#999] p-2">{i + 1}</td>
-                <td className="border border-[#999] p-2">{item.description}</td>
-                <td className="border border-[#999] p-2">{item.spec}</td>
-                <td className="border border-[#999] p-2 text-right">{item.qty}</td>
-                <td className="border border-[#999] p-2 text-right">{money(item.rate)}</td>
-                <td className="border border-[#999] p-2 text-right font-medium">{money(item.amount)}</td>
-              </tr>
-            ))}
+            {lineItems.map((item, i) => {
+              // Older invoices saved before per-item GST existed fall back
+              // to the invoice's own (then-flat) GST% rather than 0.
+              const itemGstPercent = item.gstPercent ?? Number(invoice.gstPercent);
+              const itemGstAmount = item.amount * (itemGstPercent / 100);
+              return (
+                <tr key={i}>
+                  <td className="border border-[#999] p-2">{i + 1}</td>
+                  <td className="border border-[#999] p-2">{item.description}</td>
+                  <td className="border border-[#999] p-2">{item.spec}</td>
+                  <td className="border border-[#999] p-2">{brandLabel(item.brand) ?? "—"}</td>
+                  <td className="border border-[#999] p-2 text-right">{item.qty}</td>
+                  <td className="border border-[#999] p-2 text-right">{money(item.rate)}</td>
+                  <td className="border border-[#999] p-2 text-right">{itemGstPercent}%</td>
+                  <td className="border border-[#999] p-2 text-right font-medium">{money(item.amount)}</td>
+                  <td className="border border-[#999] p-2 text-right font-medium">
+                    {money(item.amount + itemGstAmount)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
 
@@ -113,7 +128,7 @@ export default async function InvoicePrintPage({
               </tr>
               <tr>
                 <td className="border border-[#999] bg-[#f2f7f3] p-2 font-semibold">
-                  GST ({invoice.gstPercent.toString()}%)
+                  GST (avg {money(Number(invoice.gstPercent))}%)
                 </td>
                 <td className="border border-[#999] p-2 text-right">₹ {money(gstAmount)}</td>
               </tr>

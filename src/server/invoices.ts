@@ -3,17 +3,31 @@
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
 import { guessEquipmentType, defaultWarrantyProductName } from "@/lib/installationEquipment";
-import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
+import { DEFAULT_ESTIMATE_TERMS, DEFAULT_ITEM_GST_PERCENT } from "@/lib/estimateDefaults";
 import type { EstimateLineItem } from "@/server/leads";
 import type { InstalledEquipmentItem } from "@/server/connections";
 
 export type InvoiceLineItem = {
   description: string;
   spec?: string;
+  brand?: string;
   qty: number;
   rate: number;
   amount: number;
+  // Per-item GST, same rationale as Estimate.lineItems — see EstimateLineItem.
+  gstPercent: number;
 };
+
+function computeInvoiceTotals(items: InvoiceLineItem[]) {
+  const subtotal = items.reduce((sum, li) => sum + li.amount, 0);
+  const gstAmount = items.reduce((sum, li) => sum + li.amount * ((li.gstPercent || 0) / 100), 0);
+  const totalAmount = subtotal + gstAmount;
+  // Invoice.gstPercent is the blended/effective rate derived from the line
+  // items — kept for display and as a fallback for older invoices/items
+  // saved before this field existed. Same pattern as Estimate.gstPercent.
+  const gstPercent = subtotal > 0 ? (gstAmount / subtotal) * 100 : 0;
+  return { subtotal, gstAmount, totalAmount, gstPercent };
+}
 
 async function generateInvoiceNumber(tenantSlug: string) {
   const now = new Date();
@@ -40,14 +54,16 @@ function buildInvoiceLineItems(
   quoteLineItems: EstimateLineItem[],
 ): InvoiceLineItem[] {
   return equipment.map((item) => {
-    const matchingQuoteRate = quoteLineItems.find((li) => guessEquipmentType(li.description) === item.type)?.rate ?? 0;
+    const matchingQuoteItem = quoteLineItems.find((li) => guessEquipmentType(li.description) === item.type);
     const qty = item.quantity;
-    const rate = matchingQuoteRate;
+    const rate = matchingQuoteItem?.rate ?? 0;
     return {
       description: defaultWarrantyProductName(item),
       spec: item.model,
+      brand: item.brand,
       qty,
       rate,
+      gstPercent: matchingQuoteItem?.gstPercent ?? DEFAULT_ITEM_GST_PERCENT,
       amount: qty * rate,
     };
   });
@@ -69,11 +85,7 @@ export async function generateInvoice(connectionId: string) {
   const quoteLineItems = (finalEstimate?.lineItems as unknown as EstimateLineItem[] | null) ?? [];
   const equipment = (connection.installedEquipment ?? []) as InstalledEquipmentItem[];
   const items = buildInvoiceLineItems(equipment, quoteLineItems);
-
-  const subtotal = items.reduce((sum, li) => sum + li.amount, 0);
-  const gstPercent = finalEstimate ? Number(finalEstimate.gstPercent) : 0;
-  const gstAmount = subtotal * (gstPercent / 100);
-  const totalAmount = subtotal + gstAmount;
+  const { subtotal, gstAmount, totalAmount, gstPercent } = computeInvoiceTotals(items);
 
   const invoice = await db.invoice.create({
     data: {
@@ -98,7 +110,6 @@ export async function updateInvoice(
   invoiceId: string,
   input: {
     lineItems: InvoiceLineItem[];
-    gstPercent: number;
     invoiceDate?: Date;
     notes?: string;
   },
@@ -109,17 +120,15 @@ export async function updateInvoice(
 
   const items = input.lineItems
     .filter((li) => li.description.trim().length > 0)
-    .map((li) => ({ ...li, amount: li.qty * li.rate }));
-  const subtotal = items.reduce((sum, li) => sum + li.amount, 0);
-  const gstAmount = subtotal * (input.gstPercent / 100);
-  const totalAmount = subtotal + gstAmount;
+    .map((li) => ({ ...li, amount: li.qty * li.rate, gstPercent: li.gstPercent || 0 }));
+  const { subtotal, gstAmount, totalAmount, gstPercent } = computeInvoiceTotals(items);
 
   await db.invoice.update({
     where: { id: invoiceId },
     data: {
       lineItems: items,
       subtotal,
-      gstPercent: input.gstPercent,
+      gstPercent,
       gstAmount,
       totalAmount,
       invoiceDate: input.invoiceDate,
