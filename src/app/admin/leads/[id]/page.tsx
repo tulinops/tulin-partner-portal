@@ -70,24 +70,33 @@ export default async function LeadDetailPage({
           <CardTitle>Pipeline stage</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={moveStageAction} className="flex flex-wrap gap-2">
-            {STAGES.map((s) => (
-              <Button
-                key={s}
-                type="submit"
-                name="stage"
-                value={s}
-                variant={s === lead.stage ? "default" : "outline"}
-                size="sm"
-              >
-                {s.replace("_", " ")}
-              </Button>
-            ))}
-          </form>
-          <p className="mt-2 text-xs text-muted-foreground">
-            <strong>Won</strong> is set automatically once a quotation is approved and its site visit is
-            scheduled from the Estimate tab. <strong>Lost</strong> can be marked at any stage.
-          </p>
+          {lead.connection ? (
+            <p className="text-sm text-muted-foreground">
+              This lead has converted to a customer — its pipeline stage is fixed at <strong>Won</strong> and can
+              no longer be changed here. Manage further progress from the Connection page.
+            </p>
+          ) : (
+            <>
+              <form action={moveStageAction} className="flex flex-wrap gap-2">
+                {STAGES.map((s) => (
+                  <Button
+                    key={s}
+                    type="submit"
+                    name="stage"
+                    value={s}
+                    variant={s === lead.stage ? "default" : "outline"}
+                    size="sm"
+                  >
+                    {s.replace("_", " ")}
+                  </Button>
+                ))}
+              </form>
+              <p className="mt-2 text-xs text-muted-foreground">
+                <strong>Won</strong> is set automatically once a quotation is approved and its site visit is
+                scheduled from the Estimate tab. <strong>Lost</strong> can be marked at any stage.
+              </p>
+            </>
+          )}
         </CardContent>
       </Card>
 

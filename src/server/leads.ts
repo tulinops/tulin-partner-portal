@@ -101,6 +101,15 @@ async function createConnectionFromLead(
 // manual stage button bypassed that guard, so Won can no longer be set this way.
 export async function moveLeadStage(leadId: string, stage: Exclude<LeadStage, "WON">) {
   const { db } = await getTenantDb();
+  const lead = await db.lead.findFirst({ where: { id: leadId }, include: { connection: true } });
+  if (!lead) throw new Error("Lead not found");
+  // Once a lead has converted, its pre-conversion funnel stage is no longer
+  // meaningful — real progress lives on the Connection from here on. Without
+  // this guard, the still-clickable stage buttons could silently regress
+  // Lead.stage (e.g. back to "SITE_VISIT") on a lead whose Connection has
+  // already reached Installation or beyond.
+  if (lead.connection) throw new Error("This lead has already converted — its stage can no longer be changed manually");
+
   await db.lead.update({ where: { id: leadId }, data: { stage } });
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);
