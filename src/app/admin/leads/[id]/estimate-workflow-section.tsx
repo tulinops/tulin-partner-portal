@@ -39,7 +39,7 @@ const STATUS_LABELS: Record<string, string> = {
   REJECTED: "Rejected",
   LOCKED: "Locked",
 };
-const SELECTABLE_STATUSES = ["DRAFT", "SENT", "ACCEPTED", "LOCKED"] as const;
+const SELECTABLE_STATUSES = ["DRAFT", "SENT", "ACCEPTED", "REJECTED", "LOCKED"] as const;
 
 function defaultValidUntil() {
   return new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -257,7 +257,18 @@ export async function EstimateWorkflowSection({
 
       <form action={statusAction} className="flex flex-wrap items-end gap-2">
         <div className="space-y-1">
-          <Select name="status" defaultValue={active.status} disabled={stageAdvanced}>
+          {/* Keyed so switching quote tabs (or a save changing updatedAt)
+              forces a remount — this is an uncontrolled Select, so without a
+              key change it keeps whatever value was selected for whichever
+              quote was viewed *before*, and submitting without noticing
+              silently overwrites the current quote's real status with that
+              stale leftover value. */}
+          <Select
+            key={`${active.id}-${active.updatedAt.getTime()}`}
+            name="status"
+            defaultValue={active.status}
+            disabled={stageAdvanced}
+          >
             <SelectTrigger className="w-48">
               <SelectValue />
             </SelectTrigger>

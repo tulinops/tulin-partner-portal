@@ -1084,7 +1084,15 @@ export default async function ConnectionDetailPage({
                   <input type="hidden" name="loanId" value={currentLoanApplication.id} />
                   <div className="space-y-2">
                     <Label htmlFor="loanStatus">Status</Label>
-                    <Select name="status" defaultValue={currentLoanApplication.status}>
+                    {/* Keyed so a reapplication (a new LoanApplication
+                        replacing the current one in this same slot) forces a
+                        remount — same stale-uncontrolled-Select issue fixed
+                        for the Estimate status dropdown. */}
+                    <Select
+                      key={currentLoanApplication.id}
+                      name="status"
+                      defaultValue={currentLoanApplication.status}
+                    >
                       <SelectTrigger id="loanStatus">
                         <SelectValue />
                       </SelectTrigger>
