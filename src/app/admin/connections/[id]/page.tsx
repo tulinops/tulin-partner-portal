@@ -179,8 +179,6 @@ export default async function ConnectionDetailPage({
   const {
     connection,
     amountCollected,
-    allocatedCost,
-    profit,
     documentsVerified,
     currentLoanApplication,
     loanPendingAmount,
@@ -450,6 +448,18 @@ export default async function ConnectionDetailPage({
   const estimateTotal = finalEstimate ? Number(finalEstimate.totalAmount) : null;
   const estimateSubsidy = finalEstimate ? Number(finalEstimate.subsidyEstimate ?? 0) : 0;
   const netDue = (estimateTotal ?? 0) - estimateSubsidy;
+  // Prefer the real tracked subsidy figures on the Payments tab (approved,
+  // then applied) once they exist — they're more authoritative than the
+  // estimate's original placeholder figure from before the application
+  // actually started.
+  const subsidyAmount =
+    connection.subsidyApprovedAmount != null
+      ? Number(connection.subsidyApprovedAmount)
+      : connection.subsidyAppliedAmount != null
+        ? Number(connection.subsidyAppliedAmount)
+        : finalEstimate?.subsidyEstimate != null
+          ? Number(finalEstimate.subsidyEstimate)
+          : null;
   const paymentStatus =
     amountCollected <= 0
       ? "₹0 collected yet"
@@ -514,21 +524,25 @@ export default async function ConnectionDetailPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Collected</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Customer payment</CardTitle>
           </CardHeader>
           <CardContent className="font-mono text-xl font-semibold">{money(amountCollected)}</CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Allocated cost</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Subsidy amount</CardTitle>
           </CardHeader>
-          <CardContent className="font-mono text-xl font-semibold">{money(allocatedCost)}</CardContent>
+          <CardContent className="font-mono text-xl font-semibold">
+            {subsidyAmount !== null ? money(subsidyAmount) : "—"}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Profit</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total amount</CardTitle>
           </CardHeader>
-          <CardContent className="font-mono text-xl font-semibold">{money(profit)}</CardContent>
+          <CardContent className="font-mono text-xl font-semibold">
+            {estimateTotal !== null ? money(estimateTotal) : "—"}
+          </CardContent>
         </Card>
       </div>
     </div>
