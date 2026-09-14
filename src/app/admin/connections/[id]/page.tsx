@@ -31,9 +31,10 @@ import { getBusinessProfile } from "@/server/business-profile";
 import { SitePhotos } from "./site-photos";
 import { CustomerTabs } from "./customer-tabs";
 import { InstalledEquipmentEditor } from "./installed-equipment-editor";
+import { WarrantyRecordForm } from "./warranty-record-form";
 import { EstimateWorkflowSection } from "@/app/admin/leads/[id]/estimate-workflow-section";
 import { STAGE_LABELS, STAGE_ORDER } from "@/lib/connectionStage";
-import { EQUIPMENT_TYPES, buildEquipmentFromEstimateLineItems } from "@/lib/installationEquipment";
+import { buildEquipmentFromEstimateLineItems } from "@/lib/installationEquipment";
 import { brandLabel } from "@/lib/estimateBrands";
 import type {
   SiteVisitStatus,
@@ -120,21 +121,6 @@ const INSTALLATION_STATUSES = [
 // Fallback only — the form always sends the real row count via a hidden
 // "equipCount" field, since "+ Add item" can push rows past any fixed guess.
 const EQUIPMENT_ROW_COUNT_FALLBACK = 20;
-
-const WARRANTY_TYPES = ["PRODUCT", "PERFORMANCE", "WORKMANSHIP"] as const;
-
-function defaultWarrantyProductName(item: { type: EquipmentType; brand?: string }) {
-  return `${item.brand ? item.brand + " " : ""}${item.type.replace(/_/g, " ")}`;
-}
-
-// Only PANEL/INVERTER have an established default — same convention already
-// used by recordInstallationSignOff's auto-warranty logic (25yr/8yr). No
-// invented numbers for the other equipment types; the admin fills those in.
-function defaultPeriodMonths(type: EquipmentType) {
-  if (type === "PANEL") return 300;
-  if (type === "INVERTER") return 96;
-  return undefined;
-}
 
 function datetimeLocalValue(d: Date | null | undefined) {
   return d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
@@ -1279,146 +1265,10 @@ export default async function ConnectionDetailPage({
           <p className="text-sm text-muted-foreground">No warranty records yet.</p>
         )}
 
-        <div className="space-y-4 border-t pt-4">
-          <p className="text-sm font-medium">Add from installed equipment</p>
-          {installedEquipment.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No equipment recorded yet — add it on the Installation tab first.
-            </p>
-          )}
-          {installedEquipment.map((item, i) => (
-            <form
-              key={i}
-              action={warrantyCreateAction}
-              className="grid gap-3 rounded-md border p-3 sm:grid-cols-3"
-            >
-              <input type="hidden" name="equipmentType" value={item.type} />
-              <p className="text-sm font-medium sm:col-span-3">
-                {item.type.replace(/_/g, " ")}
-                {item.brand ? ` · ${item.brand}` : ""}
-                {item.serialNumber ? ` · ${item.serialNumber}` : ""}
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor={`productName-${i}`}>Product name</Label>
-                <Input id={`productName-${i}`} name="productName" defaultValue={defaultWarrantyProductName(item)} required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`manufacturer-${i}`}>Manufacturer</Label>
-                <Input id={`manufacturer-${i}`} name="manufacturer" defaultValue={item.brand ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`model-${i}`}>Model</Label>
-                <Input id={`model-${i}`} name="model" defaultValue={item.model ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`serialNumber-${i}`}>Serial number</Label>
-                <Input id={`serialNumber-${i}`} name="serialNumber" defaultValue={item.serialNumber ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`warrantyType-${i}`}>Warranty type</Label>
-                <Select name="warrantyType" defaultValue="PRODUCT">
-                  <SelectTrigger id={`warrantyType-${i}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WARRANTY_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`startDate-${i}`}>Start date</Label>
-                <Input id={`startDate-${i}`} name="startDate" type="date" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor={`periodMonths-${i}`}>Period (months)</Label>
-                <Input
-                  id={`periodMonths-${i}`}
-                  name="periodMonths"
-                  type="number"
-                  defaultValue={defaultPeriodMonths(item.type)}
-                  required
-                />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label htmlFor={`terms-${i}`}>Terms</Label>
-                <Input id={`terms-${i}`} name="terms" />
-              </div>
-              <div className="flex items-end">
-                <Button type="submit" size="sm">
-                  Add warranty record
-                </Button>
-              </div>
-            </form>
-          ))}
-        </div>
-
-        <form action={warrantyCreateAction} className="grid gap-4 border-t pt-4 sm:grid-cols-3">
-          <p className="text-sm font-medium sm:col-span-3">Add warranty record (custom)</p>
-          <div className="space-y-2">
-            <Label htmlFor="equipmentType">Equipment type</Label>
-            <Select name="equipmentType" required>
-              <SelectTrigger id="equipmentType">
-                <SelectValue placeholder="Select" />
-              </SelectTrigger>
-              <SelectContent>
-                {EQUIPMENT_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t.replace(/_/g, " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="productName">Product name</Label>
-            <Input id="productName" name="productName" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="manufacturer">Manufacturer</Label>
-            <Input id="manufacturer" name="manufacturer" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="model">Model</Label>
-            <Input id="model" name="model" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="serialNumber">Serial number</Label>
-            <Input id="serialNumber" name="serialNumber" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="warrantyType">Warranty type</Label>
-            <Select name="warrantyType" defaultValue="PRODUCT">
-              <SelectTrigger id="warrantyType">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {WARRANTY_TYPES.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t.replace(/_/g, " ")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="startDate">Start date</Label>
-            <Input id="startDate" name="startDate" type="date" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="periodMonths">Period (months)</Label>
-            <Input id="periodMonths" name="periodMonths" type="number" required />
-          </div>
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="terms">Terms</Label>
-            <Input id="terms" name="terms" />
-          </div>
-          <div className="flex items-end">
-            <Button type="submit">Add warranty record</Button>
-          </div>
+        <form action={warrantyCreateAction} className="space-y-4 border-t pt-4">
+          <p className="text-sm font-medium">Add warranty record</p>
+          <WarrantyRecordForm installedEquipment={installedEquipment} />
+          <Button type="submit">Add warranty record</Button>
         </form>
       </CardContent>
     </Card>

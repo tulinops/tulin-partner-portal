@@ -62,3 +62,24 @@ export function buildEquipmentFromEstimateLineItems(
   }
   return items;
 }
+
+export const WARRANTY_TYPES = ["PRODUCT", "PERFORMANCE", "WORKMANSHIP"] as const;
+
+export function defaultWarrantyProductName(item: { type: EquipmentType; brand?: string }) {
+  return `${item.brand ? item.brand + " " : ""}${item.type.replace(/_/g, " ")}`;
+}
+
+// Only PANEL/INVERTER have an established default — same convention already
+// used by recordInstallationSignOff's auto-warranty logic (25yr/8yr). No
+// invented numbers for the other equipment types; the admin fills those in.
+export function defaultPeriodMonths(type: EquipmentType) {
+  if (type === "PANEL") return 300;
+  if (type === "INVERTER") return 96;
+  return undefined;
+}
+
+export function equipmentOptionLabel(item: { type: EquipmentType; brand?: string; serialNumber?: string }) {
+  return `${item.type.replace(/_/g, " ")}${item.brand ? ` · ${item.brand}` : ""}${
+    item.serialNumber ? ` · ${item.serialNumber}` : ""
+  }`;
+}
