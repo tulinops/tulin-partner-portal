@@ -34,8 +34,8 @@ export function AppSidebar({
 
   return (
     <Sidebar variant="inset" collapsible="icon" className="print:hidden">
-      <SidebarHeader>
-        <div className="flex items-center gap-2.5 px-2 py-1.5">
+      <SidebarHeader className="h-14 justify-center border-b border-sidebar-border">
+        <div className="flex items-center gap-2.5 px-1">
           <span aria-hidden className="size-2.5 shrink-0 rotate-45 rounded-[3px] bg-primary" />
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <p className="truncate font-heading text-sm font-extrabold tracking-tight">{brand.title}</p>
