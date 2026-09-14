@@ -13,7 +13,7 @@ import { UserMenu } from "./UserMenu";
 
 export function AppHeader({ user }: { user: { name?: string | null; email?: string | null } }) {
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center justify-between gap-4 border-b border-border bg-background px-4 print:hidden">
+    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-4 print:hidden">
       <div className="flex min-w-0 items-center gap-3">
         <SidebarTrigger />
         <Separator orientation="vertical" className="h-4" />
