@@ -1,7 +1,11 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
+import { requireAdmin } from "@/lib/permissions";
 import type { DocumentStatus } from "@/generated/prisma/enums";
 
 export async function listRequiredDocumentTypes() {
@@ -85,6 +89,46 @@ export async function updateDocumentStatus(input: {
   await db.connectionDocument.update({
     where: { id: input.connectionDocumentId },
     data: { status: input.status, remarks: input.remarks },
+  });
+  revalidatePath(`/admin/connections/${doc.connectionId}`);
+}
+
+const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
+
+// Same disk-write pattern as uploadSitePhoto (src/server/connections.ts) —
+// public/uploads/<tenantId>/<connectionId>/<uuid><ext>, capped at 8MB. Images
+// and PDFs both accepted since documents like Aadhaar/electricity bills are
+// commonly scanned as either.
+export async function uploadConnectionDocument(formData: FormData) {
+  const { db, tenantId } = await getTenantDb();
+  const connectionDocumentId = String(formData.get("connectionDocumentId") || "");
+  const file = formData.get("file");
+
+  const doc = await db.connectionDocument.findFirst({ where: { id: connectionDocumentId } });
+  if (!doc) throw new Error("Document not found");
+  if (!(file instanceof File) || file.size === 0) throw new Error("No file provided");
+  if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
+    throw new Error("Only image or PDF files are allowed");
+  }
+  if (file.size > MAX_DOCUMENT_BYTES) throw new Error("File is too large (max 8MB)");
+
+  const session = await requireAdmin();
+  const ext = path.extname(file.name) || ".pdf";
+  const fileName = `${randomUUID()}${ext}`;
+  const relativeDir = path.join("uploads", tenantId, doc.connectionId);
+  const uploadDir = path.join(process.cwd(), "public", relativeDir);
+  await mkdir(uploadDir, { recursive: true });
+  await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
+
+  await db.connectionDocument.update({
+    where: { id: connectionDocumentId },
+    data: {
+      filePath: path.join(relativeDir, fileName).split(path.sep).join("/"),
+      originalName: file.name,
+      uploadedAt: new Date(),
+      uploadedById: session.user.id,
+      status: "UPLOADED",
+    },
   });
   revalidatePath(`/admin/connections/${doc.connectionId}`);
 }

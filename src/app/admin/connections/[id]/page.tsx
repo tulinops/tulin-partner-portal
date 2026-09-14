@@ -22,6 +22,7 @@ import {
 import {
   ensureConnectionDocuments,
   updateDocumentStatus,
+  uploadConnectionDocument,
 } from "@/server/documents";
 import { listInventoryItems, allocateToConnection } from "@/server/inventory";
 import { listStaffMembers } from "@/server/staff";
@@ -244,6 +245,11 @@ export default async function ConnectionDetailPage({
       status: formData.get("status") as DocumentStatus,
       remarks: String(formData.get("remarks") || "") || undefined,
     });
+  }
+
+  async function uploadDocumentAction(formData: FormData) {
+    "use server";
+    await uploadConnectionDocument(formData);
   }
 
   async function subsidyAction(formData: FormData) {
@@ -747,34 +753,53 @@ export default async function ConnectionDetailPage({
           .
         </p>
         {connection.connectionDocuments.map((doc) => (
-          <form key={doc.id} action={documentStatusAction} className="grid items-end gap-3 border-b pb-3 last:border-b-0 sm:grid-cols-4">
-            <input type="hidden" name="connectionDocumentId" value={doc.id} />
-            <div className="sm:col-span-1">
-              <Label className="font-normal">{doc.requiredDocumentType.name}</Label>
-            </div>
-            <div className="space-y-2">
-              <Select name="status" defaultValue={doc.status}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOCUMENT_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Input name="remarks" placeholder="Remarks" defaultValue={doc.remarks ?? ""} />
-            </div>
-            <div>
-              <Button type="submit" size="sm">
-                Save
+          <div key={doc.id} className="space-y-2 border-b pb-3 last:border-b-0">
+            <form action={documentStatusAction} className="grid items-end gap-3 sm:grid-cols-4">
+              <input type="hidden" name="connectionDocumentId" value={doc.id} />
+              <div className="sm:col-span-1">
+                <Label className="font-normal">{doc.requiredDocumentType.name}</Label>
+              </div>
+              <div className="space-y-2">
+                <Select name="status" defaultValue={doc.status}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOCUMENT_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Input name="remarks" placeholder="Remarks" defaultValue={doc.remarks ?? ""} />
+              </div>
+              <div>
+                <Button type="submit" size="sm">
+                  Save
+                </Button>
+              </div>
+            </form>
+            <form action={uploadDocumentAction} className="flex flex-wrap items-center gap-2 text-sm">
+              <input type="hidden" name="connectionDocumentId" value={doc.id} />
+              <input type="file" name="file" accept="image/*,application/pdf" required className="text-xs" />
+              <Button type="submit" size="sm" variant="outline">
+                Upload file
               </Button>
-            </div>
-          </form>
+              {doc.filePath && (
+                <a
+                  href={`/${doc.filePath}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-muted-foreground underline underline-offset-4"
+                >
+                  View current file{doc.originalName ? ` (${doc.originalName})` : ""}
+                </a>
+              )}
+            </form>
+          </div>
         ))}
         {connection.connectionDocuments.length === 0 && (
           <p className="text-sm text-muted-foreground">

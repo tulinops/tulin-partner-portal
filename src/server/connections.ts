@@ -270,11 +270,17 @@ export async function recordSiteVisitResult(input: {
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
 
+  // Recording a result is how a proprietor says "the visit happened" — it
+  // completes the visit itself, same "nudge" pattern updateSiteVisitStatus
+  // uses, so the stage tracker actually advances to Documents from here
+  // instead of requiring a separate trip to the Status dropdown above.
   await db.connection.update({
     where: { id: input.connectionId },
     data: {
       siteVisitResult: input.result,
       siteVisitWorkerNotes: input.workerNotes,
+      siteVisitStatus: "COMPLETED",
+      status: connection.status === "SITE_INSPECTION_PENDING" ? "SITE_INSPECTION_DONE" : connection.status,
     },
   });
   revalidatePath(`/admin/connections/${input.connectionId}`);
