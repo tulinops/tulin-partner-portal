@@ -822,6 +822,17 @@ export default async function ConnectionDetailPage({
 
   const subsidyLoanSection = (
     <div className="space-y-6">
+      <div
+        className={
+          stage === "subsidyloan"
+            ? "rounded-md bg-amber-100 p-3 text-sm font-medium text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+            : "rounded-md bg-primary/10 p-3 text-sm font-medium text-primary"
+        }
+      >
+        {stage === "subsidyloan"
+          ? 'Financing isn\'t settled yet — set the subsidy status to "Disbursed", or the loan status to "Completed", to move this customer to Installation.'
+          : "Financing settled — this customer has moved to Installation."}
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>How is the customer paying?</CardTitle>

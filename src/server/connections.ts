@@ -392,6 +392,12 @@ export async function createLoanApplication(input: {
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
 
+  // Same convenience nudge as updateSubsidyApplication's APPLIED case — the
+  // loan branch was missing this entirely, so a loan-financed connection's
+  // status badge never left SITE_INSPECTION_DONE no matter how far the loan
+  // actually progressed.
+  const nextStatus = connection.status === "SITE_INSPECTION_DONE" ? "SUBSIDY_APPLIED" : connection.status;
+
   // Supersede any prior application for this connection, same
   // supersede-and-mark-current pattern as Estimate.version/isCurrent.
   await db.$transaction(async (tx) => {
@@ -409,6 +415,7 @@ export async function createLoanApplication(input: {
         applicationDate: input.applicationDate,
       },
     });
+    await tx.connection.update({ where: { id: input.connectionId }, data: { status: nextStatus } });
   });
   revalidatePath(`/admin/connections/${input.connectionId}`);
 }
@@ -428,21 +435,33 @@ export async function updateLoanApplication(input: {
   const { db } = await getTenantDb();
   const loan = await db.loanApplication.findFirst({ where: { id: input.id } });
   if (!loan) throw new Error("Loan application not found");
+  const connection = await db.connection.findFirst({ where: { id: loan.connectionId } });
+  if (!connection) throw new Error("Connection not found");
 
-  await db.loanApplication.update({
-    where: { id: input.id },
-    data: {
-      status: input.status,
-      sanctionedAt: input.sanctionedAt,
-      sanctionedAmount: input.sanctionedAmount,
-      disbursedAmount: input.disbursedAmount,
-      disbursedAt: input.disbursedAt,
-      paymentReceivedByProprietorAmount: input.paymentReceivedByProprietorAmount,
-      paymentReceivedByProprietorAt: input.paymentReceivedByProprietorAt,
-      paymentReference: input.paymentReference,
-      notes: input.notes,
-    },
-  });
+  // Mirrors updateSubsidyApplication's APPROVED nudge, so both financing
+  // paths reach the same "SUBSIDY_APPROVED" checkpoint that
+  // updateInstallationStatus's own nudge requires to advance further —
+  // without this, only subsidy-financed connections could ever move their
+  // status badge past this point.
+  const nextStatus = input.status === "APPROVED" && connection.status === "SUBSIDY_APPLIED" ? "SUBSIDY_APPROVED" : connection.status;
+
+  await db.$transaction([
+    db.loanApplication.update({
+      where: { id: input.id },
+      data: {
+        status: input.status,
+        sanctionedAt: input.sanctionedAt,
+        sanctionedAmount: input.sanctionedAmount,
+        disbursedAmount: input.disbursedAmount,
+        disbursedAt: input.disbursedAt,
+        paymentReceivedByProprietorAmount: input.paymentReceivedByProprietorAmount,
+        paymentReceivedByProprietorAt: input.paymentReceivedByProprietorAt,
+        paymentReference: input.paymentReference,
+        notes: input.notes,
+      },
+    }),
+    db.connection.update({ where: { id: loan.connectionId }, data: { status: nextStatus } }),
+  ]);
   revalidatePath(`/admin/connections/${loan.connectionId}`);
 }
 
