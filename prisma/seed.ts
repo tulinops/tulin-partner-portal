@@ -12,8 +12,14 @@ function randomPassword() {
 }
 
 async function main() {
+  // Both accounts are upserted with `update: {}` — re-running this script
+  // must never silently regenerate/print a password for a user that already
+  // exists, since that print would be a lie (the upsert's `update: {}` never
+  // actually touches passwordHash, so the DB keeps whatever hash it already
+  // had). Only generate and print a password when actually creating the row.
   const superAdminEmail = "tulin.ops@gmail.com";
-  const superAdminPassword = randomPassword();
+  const existingSuperAdmin = await prisma.user.findUnique({ where: { email: superAdminEmail } });
+  const superAdminPassword = existingSuperAdmin ? null : randomPassword();
 
   await prisma.user.upsert({
     where: { email: superAdminEmail },
@@ -22,13 +28,14 @@ async function main() {
       email: superAdminEmail,
       name: "Tulin Super Admin",
       role: "SUPER_ADMIN",
-      passwordHash: await bcrypt.hash(superAdminPassword, 10),
+      passwordHash: await bcrypt.hash(superAdminPassword ?? randomPassword(), 10),
       mustChangePassword: false,
     },
   });
 
   const demoAdminEmail = "admin@demo-solar.test";
-  const demoAdminPassword = randomPassword();
+  const existingDemoAdmin = await prisma.user.findUnique({ where: { email: demoAdminEmail } });
+  const demoAdminPassword = existingDemoAdmin ? null : randomPassword();
 
   const tenant = await prisma.tenant.upsert({
     where: { slug: "demo-solar" },
@@ -42,7 +49,7 @@ async function main() {
           email: demoAdminEmail,
           name: "Demo Proprietor",
           role: "ADMIN",
-          passwordHash: await bcrypt.hash(demoAdminPassword, 10),
+          passwordHash: await bcrypt.hash(demoAdminPassword ?? randomPassword(), 10),
           mustChangePassword: false,
         },
       },
@@ -108,8 +115,16 @@ async function main() {
   }
 
   console.log("Seed complete.");
-  console.log(`Super Admin login: ${superAdminEmail} / ${superAdminPassword}`);
-  console.log(`Demo tenant Admin login: ${demoAdminEmail} / ${demoAdminPassword}`);
+  console.log(
+    superAdminPassword
+      ? `Super Admin login: ${superAdminEmail} / ${superAdminPassword}`
+      : `Super Admin ${superAdminEmail} already exists — password unchanged.`,
+  );
+  console.log(
+    demoAdminPassword
+      ? `Demo tenant Admin login: ${demoAdminEmail} / ${demoAdminPassword}`
+      : `Demo tenant Admin ${demoAdminEmail} already exists — password unchanged.`,
+  );
 }
 
 main()
