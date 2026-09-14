@@ -641,7 +641,17 @@ export default async function ConnectionDetailPage({
             </div>
             <div className="space-y-2">
               <Label htmlFor="siteVisitStatus">Status</Label>
-              <Select name="siteVisitStatus" defaultValue={connection.siteVisitStatus}>
+              {/* Keyed to connection.updatedAt so this remounts and re-syncs
+                  whenever anything else changes siteVisitStatus (e.g.
+                  recording a site visit result auto-completes it) — without
+                  this, re-saving the assignment form afterward would resubmit
+                  this Select's stale original value and silently revert the
+                  status right back, exactly undoing that auto-completion. */}
+              <Select
+                key={connection.updatedAt.getTime()}
+                name="siteVisitStatus"
+                defaultValue={connection.siteVisitStatus}
+              >
                 <SelectTrigger id="siteVisitStatus">
                   <SelectValue />
                 </SelectTrigger>
@@ -1227,7 +1237,15 @@ export default async function ConnectionDetailPage({
           <form action={installationStatusAction} className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
               <Label htmlFor="installationStatus">Status</Label>
-              <Select name="installationStatus" defaultValue={connection.installationStatus}>
+              {/* Keyed so this re-syncs after recordInstallationSignOff sets
+                  installationStatus to COMPLETED as a side effect of the
+                  separate sign-off form below — same stale-Select issue as
+                  the site visit status dropdown. */}
+              <Select
+                key={connection.updatedAt.getTime()}
+                name="installationStatus"
+                defaultValue={connection.installationStatus}
+              >
                 <SelectTrigger id="installationStatus" className="w-56">
                   <SelectValue />
                 </SelectTrigger>
