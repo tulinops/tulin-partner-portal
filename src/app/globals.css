@@ -128,3 +128,13 @@
     @apply font-sans;
   }
 }
+
+/* The Sidebar primitive's layout-reserving spacer has no className prop to
+   hide via print:hidden like the sidebar itself — collapse it directly so
+   printed estimates/invoices (which render inside the admin shell) use the
+   full page width, matching pre-sidebar print output. */
+@media print {
+  [data-slot="sidebar-gap"] {
+    display: none;
+  }
+}
