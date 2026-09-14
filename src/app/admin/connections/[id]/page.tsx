@@ -26,12 +26,15 @@ import {
 } from "@/server/documents";
 import { listInventoryItems, allocateToConnection } from "@/server/inventory";
 import { listStaffMembers } from "@/server/staff";
-import { addLeadNote } from "@/server/leads";
+import { addLeadNote, type EstimateLineItem } from "@/server/leads";
 import { getBusinessProfile } from "@/server/business-profile";
 import { SitePhotos } from "./site-photos";
 import { CustomerTabs } from "./customer-tabs";
+import { InstalledEquipmentEditor } from "./installed-equipment-editor";
 import { EstimateWorkflowSection } from "@/app/admin/leads/[id]/estimate-workflow-section";
 import { STAGE_LABELS, STAGE_ORDER } from "@/lib/connectionStage";
+import { EQUIPMENT_TYPES, buildEquipmentFromEstimateLineItems } from "@/lib/installationEquipment";
+import { brandLabel } from "@/lib/estimateBrands";
 import type {
   SiteVisitStatus,
   SiteVisitResult,
@@ -113,17 +116,9 @@ const INSTALLATION_STATUSES = [
   "COMPLETED",
 ] as const;
 
-const EQUIPMENT_TYPES = [
-  "PANEL",
-  "INVERTER",
-  "MOUNTING_STRUCTURE",
-  "DC_CABLE",
-  "AC_CABLE",
-  "EARTHING_KIT",
-  "LIGHTNING_ARRESTOR",
-  "NET_METER",
-  "OTHER",
-] as const;
+// Fallback only — the form always sends the real row count via a hidden
+// "equipCount" field, since "+ Add item" can push rows past any fixed guess.
+const EQUIPMENT_ROW_COUNT_FALLBACK = 20;
 
 function datetimeLocalValue(d: Date | null | undefined) {
   return d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
@@ -325,8 +320,9 @@ export default async function ConnectionDetailPage({
 
   async function installedEquipmentAction(formData: FormData) {
     "use server";
+    const rowCount = Number(formData.get("equipCount")) || EQUIPMENT_ROW_COUNT_FALLBACK;
     const items: InstalledEquipmentItem[] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < rowCount; i++) {
       const type = String(formData.get(`equip_${i}_type`) || "");
       if (!type) continue;
       items.push({
@@ -1098,6 +1094,16 @@ export default async function ConnectionDetailPage({
     </div>
   );
 
+  // Pre-fill from the approved quotation only while nothing has been saved
+  // yet — once the installer saves anything, that's what future loads show,
+  // never silently overwritten by the quotation again.
+  const finalEstimate = connection.lead.estimates.find((e) => e.isCurrent);
+  const finalEstimateLineItems = (finalEstimate?.lineItems as unknown as EstimateLineItem[] | null) ?? [];
+  const equipmentInitialRows =
+    installedEquipment.length > 0
+      ? installedEquipment
+      : buildEquipmentFromEstimateLineItems(finalEstimateLineItems, brandLabel(finalEstimate?.brand));
+
   const installationSection = (
     <div className="space-y-6">
       <Card>
@@ -1127,40 +1133,9 @@ export default async function ConnectionDetailPage({
           <div>
             <p className="mb-2 text-sm font-medium">Installed equipment</p>
             <form action={installedEquipmentAction} className="space-y-2">
-              {Array.from({ length: 6 }).map((_, i) => {
-                const existing = installedEquipment[i];
-                return (
-                  <div key={i} className="grid gap-2 sm:grid-cols-5">
-                    <Select name={`equip_${i}_type`} defaultValue={existing?.type}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EQUIPMENT_TYPES.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t.replace(/_/g, " ")}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input name={`equip_${i}_brand`} placeholder="Brand" defaultValue={existing?.brand ?? ""} />
-                    <Input name={`equip_${i}_model`} placeholder="Model" defaultValue={existing?.model ?? ""} />
-                    <Input
-                      name={`equip_${i}_serial`}
-                      placeholder="Serial no."
-                      defaultValue={existing?.serialNumber ?? ""}
-                    />
-                    <Input
-                      name={`equip_${i}_qty`}
-                      type="number"
-                      placeholder="Qty"
-                      defaultValue={existing?.quantity?.toString() ?? "1"}
-                    />
-                  </div>
-                );
-              })}
+              <InstalledEquipmentEditor initialItems={equipmentInitialRows} />
               <Button type="submit" size="sm">
-                Save equipment
+                Save
               </Button>
             </form>
           </div>
