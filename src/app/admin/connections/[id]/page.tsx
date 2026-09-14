@@ -1238,7 +1238,10 @@ export default async function ConnectionDetailPage({
           <div>
             <p className="mb-2 text-sm font-medium">Installed equipment</p>
             <form action={installedEquipmentAction} className="space-y-2">
-              <InstalledEquipmentEditor initialItems={equipmentInitialRows} />
+              {/* Forces a remount after every save so edits (brand, serial
+                  numbers, etc.) don't look like they vanished — same
+                  stale-client-state issue fixed for the Estimate/Invoice editors. */}
+              <InstalledEquipmentEditor key={connection.updatedAt.getTime()} initialItems={equipmentInitialRows} />
               <Button type="submit" size="sm">
                 Save
               </Button>
@@ -1388,7 +1391,14 @@ export default async function ConnectionDetailPage({
                   defaultValue={connection.invoice.invoiceDate.toISOString().slice(0, 10)}
                 />
               </div>
-              <InvoiceItemsEditor initialItems={invoiceLineItems} />
+              {/* Forces a remount after every save (updatedAt changes on
+                  write) — otherwise React reuses the same instance and its
+                  internal row state never re-syncs with the freshly saved
+                  data, making edits (brand included) look like they vanished. */}
+              <InvoiceItemsEditor
+                key={connection.invoice.updatedAt.getTime()}
+                initialItems={invoiceLineItems}
+              />
               <div className="space-y-2">
                 <Label htmlFor="notes">Terms &amp; conditions</Label>
                 <Textarea id="notes" name="notes" defaultValue={connection.invoice.notes ?? ""} rows={6} />

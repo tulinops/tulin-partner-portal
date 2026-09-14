@@ -277,6 +277,13 @@ export async function EstimateWorkflowSection({
 
       <form action={saveFieldsAction} className="space-y-4">
         <EstimateBuilderWithPreview
+          // Forces a full remount (fresh state from initialRows/etc.) both
+          // when the displayed quote changes AND after every save (updatedAt
+          // changes on write) — without this, React reuses the same instance
+          // across re-renders and its internal `rows` state (brand included)
+          // never re-syncs with the freshly saved/loaded data, making edits
+          // look like they vanished right after saving.
+          key={`${active.id}-${active.updatedAt.getTime()}`}
           customerName={customerName}
           phone={phone}
           email={email}
