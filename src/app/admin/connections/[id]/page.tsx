@@ -864,7 +864,14 @@ export default async function ConnectionDetailPage({
                 <Label className="font-normal">{doc.requiredDocumentType.name}</Label>
               </div>
               <div className="space-y-2">
-                <Select name="status" defaultValue={doc.status}>
+                {/* Keyed so this re-syncs after uploadDocumentAction
+                    auto-sets status to UPLOADED as a side effect of the
+                    separate upload form below — same stale-Select issue
+                    already fixed for the site visit/installation status
+                    dropdowns. Without this, saving this form afterward (even
+                    just to add a remark) resubmits the stale pre-upload
+                    value and reverts the status right back. */}
+                <Select key={doc.updatedAt.getTime()} name="status" defaultValue={doc.status}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
