@@ -19,7 +19,7 @@ export function AppShell({
     <TooltipProvider delayDuration={200}>
       <SidebarProvider defaultOpen={!themeConfig.layout.sideNavCollapse}>
         <AppSidebar brand={brand} portal={portal} />
-        <SidebarInset>
+        <SidebarInset className="overflow-hidden">
           <AppHeader user={user} />
           <main className="flex-1 p-4">{children}</main>
         </SidebarInset>
