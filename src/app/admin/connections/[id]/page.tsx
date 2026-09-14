@@ -375,8 +375,110 @@ export default async function ConnectionDetailPage({
     });
   }
 
+  const finalEstimate = connection.lead.estimates.find((e) => e.isCurrent);
+
+  // A Connection's computed stage is never "lead"/"estimate" — those two are
+  // always already behind it (see computeConnectionStage's own doc comment)
+  // — but every ConnectionStageKey is listed for type-safety.
+  const STAGE_META: Record<(typeof STAGE_ORDER)[number], { pending: string; next: string }> = {
+    lead: { pending: "", next: "" },
+    estimate: { pending: "", next: "" },
+    sitevisit: {
+      pending: "Site visit scheduled — awaiting the result.",
+      next: "Record the site visit result, then start document collection.",
+    },
+    documents: {
+      pending: "Chase the customer for any pending documents.",
+      next: "Once all documents are verified, move to Payments.",
+    },
+    subsidyloan: {
+      pending: "Subsidy / loan application in progress.",
+      next: "Once financing is settled, schedule the installation.",
+    },
+    installation: {
+      pending: "Installation scheduled or in progress.",
+      next: "Complete the installation and get customer sign-off.",
+    },
+    completed: {
+      pending: "Awaiting warranty record creation.",
+      next: "Warranty starts automatically once installation is marked complete.",
+    },
+    warranty: {
+      pending: "None — job complete, warranty is active.",
+      next: "Monitor for any service requests.",
+    },
+  };
+  let stageMeta = STAGE_META[stage];
+  if (stage === "sitevisit" && connection.siteVisitResult === "NOT_SUITABLE") {
+    stageMeta = { pending: "Site visit marked Not Suitable.", next: "Close this lead — it will not proceed to installation." };
+  } else if (stage === "sitevisit" && connection.siteVisitResult === "REQUIRES_FURTHER_INSPECTION") {
+    stageMeta = { pending: "Site visit flagged for further inspection.", next: "Schedule a follow-up visit before moving to Documents." };
+  }
+  const completedSteps = STAGE_ORDER.slice(0, STAGE_ORDER.indexOf(stage)).map((s) => STAGE_LABELS[s]);
+  const estimateTotal = finalEstimate ? Number(finalEstimate.totalAmount) : null;
+  const estimateSubsidy = finalEstimate ? Number(finalEstimate.subsidyEstimate ?? 0) : 0;
+  const netDue = (estimateTotal ?? 0) - estimateSubsidy;
+  const paymentStatus =
+    amountCollected <= 0
+      ? "₹0 collected yet"
+      : amountCollected >= netDue
+        ? `Fully collected (${money(amountCollected)})`
+        : `Partially collected (${money(amountCollected)})`;
+
   const overviewSection = (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>At a glance</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+          <div>
+            <p className="text-muted-foreground">Current stage</p>
+            <p className="font-medium">{STAGE_LABELS[stage]}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Completed steps</p>
+            <p className="font-medium">{completedSteps.length ? completedSteps.join(" → ") : "None yet"}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Pending action</p>
+            <p className="font-medium">{stageMeta.pending}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Next step</p>
+            <p className="font-medium">{stageMeta.next}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">System size</p>
+            <p className="font-medium">{finalEstimate ? `${Number(finalEstimate.systemSizeKw)} kW` : "—"}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Estimate total</p>
+            <p className="font-medium">{estimateTotal !== null ? money(estimateTotal) : "—"}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Payment status</p>
+            <p className="font-medium">{paymentStatus}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Installation status</p>
+            <p className="font-medium">{connection.installationStatus.replace(/_/g, " ")}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Warranty status</p>
+            <p className="font-medium">
+              {warrantyRecordsWithExpiry.length
+                ? `Active — ${warrantyRecordsWithExpiry.length} record${warrantyRecordsWithExpiry.length > 1 ? "s" : ""}`
+                : "Not yet created"}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Assigned worker</p>
+            <p className="font-medium">{connection.staffMember?.name ?? "Not assigned"}</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -1103,7 +1205,6 @@ export default async function ConnectionDetailPage({
   // Pre-fill from the approved quotation only while nothing has been saved
   // yet — once the installer saves anything, that's what future loads show,
   // never silently overwritten by the quotation again.
-  const finalEstimate = connection.lead.estimates.find((e) => e.isCurrent);
   const finalEstimateLineItems = (finalEstimate?.lineItems as unknown as EstimateLineItem[] | null) ?? [];
   const equipmentInitialRows =
     installedEquipment.length > 0
