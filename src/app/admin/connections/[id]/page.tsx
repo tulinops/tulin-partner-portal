@@ -32,6 +32,7 @@ import { SitePhotos } from "./site-photos";
 import { CustomerTabs } from "./customer-tabs";
 import { InstalledEquipmentEditor } from "./installed-equipment-editor";
 import { WarrantyRecordForm } from "./warranty-record-form";
+import { WarrantyRecordView } from "./warranty-record-view";
 import { EstimateWorkflowSection } from "@/app/admin/leads/[id]/estimate-workflow-section";
 import { STAGE_LABELS, STAGE_ORDER } from "@/lib/connectionStage";
 import { buildEquipmentFromEstimateLineItems } from "@/lib/installationEquipment";
@@ -1247,23 +1248,56 @@ export default async function ConnectionDetailPage({
         <CardTitle>Warranty</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {warrantyRecordsWithExpiry.map((w) => (
-          <div key={w.id} className="rounded-md border p-3 text-sm">
-            <p className="font-medium">
-              {w.productName} <span className="text-muted-foreground">({w.equipmentType.replace(/_/g, " ")})</span>
-            </p>
-            <p className="text-muted-foreground">
-              {[w.manufacturer, w.model, w.serialNumber].filter(Boolean).join(" · ") || "—"}
-            </p>
-            <p>
-              {w.warrantyType.replace(/_/g, " ")} warranty · {w.periodMonths} months from{" "}
-              {w.startDate.toLocaleDateString("en-IN")} · expires {w.expiryDate.toLocaleDateString("en-IN")}
-            </p>
-          </div>
-        ))}
-        {warrantyRecordsWithExpiry.length === 0 && (
-          <p className="text-sm text-muted-foreground">No warranty records yet.</p>
-        )}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Product</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Manufacturer / Model / Serial</TableHead>
+              <TableHead>Warranty</TableHead>
+              <TableHead>Expires</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {warrantyRecordsWithExpiry.map((w) => (
+              <TableRow key={w.id}>
+                <TableCell className="font-medium">{w.productName}</TableCell>
+                <TableCell>{w.equipmentType.replace(/_/g, " ")}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {[w.manufacturer, w.model, w.serialNumber].filter(Boolean).join(" · ") || "—"}
+                </TableCell>
+                <TableCell>
+                  {w.warrantyType.replace(/_/g, " ")} · {w.periodMonths}mo
+                </TableCell>
+                <TableCell>{w.expiryDate.toLocaleDateString("en-IN")}</TableCell>
+                <TableCell>
+                  <WarrantyRecordView
+                    record={{
+                      productName: w.productName,
+                      equipmentType: w.equipmentType,
+                      manufacturer: w.manufacturer,
+                      model: w.model,
+                      serialNumber: w.serialNumber,
+                      warrantyType: w.warrantyType,
+                      periodMonths: w.periodMonths,
+                      startDate: w.startDate.toLocaleDateString("en-IN"),
+                      expiryDate: w.expiryDate.toLocaleDateString("en-IN"),
+                      terms: w.terms,
+                    }}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+            {warrantyRecordsWithExpiry.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  No warranty records yet.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
 
         <form action={warrantyCreateAction} className="space-y-4 border-t pt-4">
           <p className="text-sm font-medium">Add warranty record</p>
