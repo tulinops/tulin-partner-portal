@@ -32,6 +32,7 @@ import { SitePhotos } from "./site-photos";
 import { CustomerTabs } from "./customer-tabs";
 import { InstalledEquipmentEditor } from "./installed-equipment-editor";
 import { WarrantyRecordForm } from "./warranty-record-form";
+import { AddWarrantyDialog } from "./add-warranty-dialog";
 import { WarrantyRecordView } from "./warranty-record-view";
 import { EstimateWorkflowSection } from "@/app/admin/leads/[id]/estimate-workflow-section";
 import { STAGE_LABELS, STAGE_ORDER } from "@/lib/connectionStage";
@@ -1299,11 +1300,12 @@ export default async function ConnectionDetailPage({
           </TableBody>
         </Table>
 
-        <form action={warrantyCreateAction} className="space-y-4 border-t pt-4">
-          <p className="text-sm font-medium">Add warranty record</p>
-          <WarrantyRecordForm installedEquipment={installedEquipment} />
-          <Button type="submit">Add warranty record</Button>
-        </form>
+        <AddWarrantyDialog key={warrantyRecordsWithExpiry.length}>
+          <form action={warrantyCreateAction} className="space-y-4">
+            <WarrantyRecordForm installedEquipment={installedEquipment} />
+            <Button type="submit">Add warranty record</Button>
+          </form>
+        </AddWarrantyDialog>
       </CardContent>
     </Card>
   );
