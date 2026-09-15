@@ -16,7 +16,7 @@ export function AppHeader({ user }: { user: { name?: string | null; email?: stri
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-4 print:hidden">
       <div className="flex min-w-0 items-center gap-3">
         <SidebarTrigger />
-        <Separator orientation="vertical" className="h-4 self-center" />
+        <Separator orientation="vertical" className="h-4 self-center!" />
         <div className="relative hidden sm:block">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search…" className="w-64 pl-8" disabled />
