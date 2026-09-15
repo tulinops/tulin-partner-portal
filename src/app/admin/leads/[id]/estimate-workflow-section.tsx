@@ -11,6 +11,7 @@ import {
   type getLead,
 } from "@/server/leads";
 import { EstimateBuilderWithPreview } from "./estimate-builder-with-preview";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { SOLAR_BRANDS, brandLabel, type SolarBrandValue } from "@/lib/estimateBrands";
 import { DEFAULT_ESTIMATE_TERMS, DEFAULT_ESTIMATE_ROWS } from "@/lib/estimateDefaults";
 import { isEstimateLocked, STAGE_ORDER, type ConnectionStageKey } from "@/lib/connectionStage";
@@ -336,7 +337,12 @@ export async function EstimateWorkflowSection({
 
       {isActiveFinal && !hasConnection && (connectionStage === "lead" || connectionStage === "estimate" || connectionStage === null) && (
         <form action={scheduleSiteVisitAction}>
-          <Button type="submit">Schedule site visit →</Button>
+          <ConfirmSubmitButton
+            type="submit"
+            confirmMessage="This will convert the lead into a customer and can't be undone from here. Continue?"
+          >
+            Schedule site visit →
+          </ConfirmSubmitButton>
         </form>
       )}
     </div>
