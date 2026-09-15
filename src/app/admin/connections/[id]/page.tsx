@@ -921,10 +921,10 @@ export default async function ConnectionDetailPage({
               </div>
             </form>
             {doc.filePath && isImageFile(doc.filePath) && (
-              <a href={`/${doc.filePath}`} target="_blank" rel="noreferrer" className="inline-block">
-                {/* eslint-disable-next-line @next/next/no-img-element -- local static upload, not an optimizable remote asset */}
+              <a href={doc.filePath} target="_blank" rel="noreferrer" className="inline-block">
+                {/* eslint-disable-next-line @next/next/no-img-element -- Vercel Blob URL, not an optimizable remote asset */}
                 <img
-                  src={`/${doc.filePath}`}
+                  src={doc.filePath}
                   alt={doc.originalName ?? "Uploaded document"}
                   className="h-20 w-20 rounded border object-cover"
                 />
@@ -938,7 +938,7 @@ export default async function ConnectionDetailPage({
               </Button>
               {doc.filePath && (
                 <a
-                  href={`/${doc.filePath}`}
+                  href={doc.filePath}
                   target="_blank"
                   rel="noreferrer"
                   className="text-xs text-muted-foreground underline underline-offset-4"

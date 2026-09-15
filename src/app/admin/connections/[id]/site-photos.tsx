@@ -29,10 +29,10 @@ export function SitePhotos({ connectionId, photos }: { connectionId: string; pho
             {catPhotos.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {catPhotos.map((p) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- local static upload, not an optimizable remote asset
+                  // eslint-disable-next-line @next/next/no-img-element -- Vercel Blob URL, not an optimizable remote asset
                   <img
                     key={p.filePath}
-                    src={`/${p.filePath}`}
+                    src={p.filePath}
                     alt={p.originalName}
                     className="h-16 w-16 rounded object-cover"
                   />

@@ -33,8 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# user-uploaded site-visit photos (local-disk storage, dev only — see
-# uploadSitePhoto's caveat about production/serverless hosting)
+# stray local files from before uploads moved to Vercel Blob storage
 /public/uploads/
 
 # vercel

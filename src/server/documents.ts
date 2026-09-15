@@ -1,8 +1,8 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { put } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
 import { requireAdmin } from "@/lib/permissions";
@@ -95,8 +95,8 @@ export async function updateDocumentStatus(input: {
 
 const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024;
 
-// Same disk-write pattern as uploadSitePhoto (src/server/connections.ts) —
-// public/uploads/<tenantId>/<connectionId>/<uuid><ext>, capped at 8MB. Images
+// Same Vercel Blob upload pattern as uploadSitePhoto (src/server/connections.ts) —
+// uploads/<tenantId>/<connectionId>/<uuid><ext>, capped at 8MB. Images
 // and PDFs both accepted since documents like Aadhaar/electricity bills are
 // commonly scanned as either.
 export async function uploadConnectionDocument(formData: FormData) {
@@ -115,15 +115,14 @@ export async function uploadConnectionDocument(formData: FormData) {
   const session = await requireAdmin();
   const ext = path.extname(file.name) || ".pdf";
   const fileName = `${randomUUID()}${ext}`;
-  const relativeDir = path.join("uploads", tenantId, doc.connectionId);
-  const uploadDir = path.join(process.cwd(), "public", relativeDir);
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(path.join(uploadDir, fileName), Buffer.from(await file.arrayBuffer()));
+  const pathname = `uploads/${tenantId}/${doc.connectionId}/${fileName}`;
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const blob = await put(pathname, bytes, { access: "public", contentType: file.type });
 
   await db.connectionDocument.update({
     where: { id: connectionDocumentId },
     data: {
-      filePath: path.join(relativeDir, fileName).split(path.sep).join("/"),
+      filePath: blob.url,
       originalName: file.name,
       uploadedAt: new Date(),
       uploadedById: session.user.id,

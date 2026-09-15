@@ -1,8 +1,8 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { put } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
 import { computeConnectionStage } from "@/lib/connectionStage";
@@ -310,18 +310,16 @@ export async function uploadSitePhoto(formData: FormData) {
 
   const ext = path.extname(file.name) || ".jpg";
   const fileName = `${randomUUID()}${ext}`;
-  const relativeDir = path.join("uploads", tenantId, connectionId);
-  const uploadDir = path.join(process.cwd(), "public", relativeDir);
-  await mkdir(uploadDir, { recursive: true });
+  const pathname = `uploads/${tenantId}/${connectionId}/${fileName}`;
   const bytes = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadDir, fileName), bytes);
+  const blob = await put(pathname, bytes, { access: "public", contentType: file.type });
 
   await db.sitePhoto.create({
     data: {
       tenantId,
       connectionId,
       category,
-      filePath: path.join(relativeDir, fileName).split(path.sep).join("/"),
+      filePath: blob.url,
       originalName: file.name,
     },
   });
