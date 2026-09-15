@@ -331,6 +331,20 @@ export async function updateEstimateFields(
       notes: input.notes,
     },
   });
+
+  // The Connection's systemSizeKw is a one-time snapshot taken when the lead
+  // converts (see createConnectionFromLead) — if this is the lead's final
+  // quote, keep that snapshot in sync with edits made afterward (a size
+  // filled in or corrected after approval), since the Invoice reads it from
+  // the Connection, not from the estimate.
+  if (estimate.isCurrent) {
+    await db.connection.updateMany({
+      where: { leadId: estimate.leadId },
+      data: { systemSizeKw: input.systemSizeKw },
+    });
+    revalidatePath("/admin/connections");
+  }
+
   revalidatePath(`/admin/leads/${estimate.leadId}`);
 }
 
@@ -381,6 +395,16 @@ export async function updateEstimateStatus(estimateId: string, status: EstimateS
           tenantId,
           estimate.systemSizeKw ? Number(estimate.systemSizeKw) : undefined,
         );
+      } else {
+        // A later revision can be approved after the lead already converted
+        // (e.g. a resized system) — keep the Connection's snapshot in sync
+        // rather than leaving it stuck at whatever the first accepted quote
+        // had, since the Invoice reads systemSizeKw from the Connection, not
+        // from whichever estimate happens to be current.
+        await tx.connection.update({
+          where: { leadId: estimate.leadId },
+          data: { systemSizeKw: estimate.systemSizeKw },
+        });
       }
     });
   } else {
