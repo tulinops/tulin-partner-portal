@@ -1,7 +1,5 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getLead, addLeadNote, updateLeadDetails } from "@/server/leads";
-import { getConnectionStageForLead } from "@/server/connections";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,25 +13,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 
 const NOT_YET_A_CUSTOMER = (
   <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-    Available once this lead becomes a customer — approve a quotation and schedule its site visit from the
-    Estimate tab to start the customer journey.
+    Available once this lead becomes a customer — approving a quotation starts the customer journey.
   </p>
 );
-
-function seeOnConnectionPage(connectionId: string) {
-  return (
-    <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-      This lead has already converted to a customer — its Site Visit, Documents, Payments, Installation,
-      Invoice and Warranty tabs are managed from there instead of here.{" "}
-      <Link
-        href={`/admin/connections/${connectionId}`}
-        className="font-semibold text-primary underline underline-offset-4"
-      >
-        View the Connection page →
-      </Link>
-    </p>
-  );
-}
 
 export default async function LeadDetailPage({
   params,
@@ -46,12 +28,14 @@ export default async function LeadDetailPage({
   const { quote: activeEstimateId } = await searchParams;
   const lead = await getLead(id);
   if (!lead) notFound();
+  // Once a lead converts, everything about it (Lead, Estimate, and the
+  // Site Visit/Documents/.../Warranty tabs) lives on and is fully rendered
+  // by the Connection page — there's nothing left for this page to show.
+  if (lead.connection) redirect(`/admin/connections/${lead.connection.id}`);
   const tenant = await getBusinessProfile();
-  const connectionStage = lead.connection ? await getConnectionStageForLead(id) : null;
-  const customerOnlyTabContent = lead.connection ? seeOnConnectionPage(lead.connection.id) : NOT_YET_A_CUSTOMER;
 
   const currentEstimate = lead.estimates.find((e) => e.isCurrent);
-  const stage = connectionStage ?? (lead.estimates.length > 0 ? "estimate" : "lead");
+  const stage = lead.estimates.length > 0 ? "estimate" : "lead";
 
   async function addNoteAction(formData: FormData) {
     "use server";
@@ -154,7 +138,9 @@ export default async function LeadDetailPage({
           leadId={id}
           estimates={lead.estimates}
           activeEstimateId={activeEstimateId}
-          connectionStage={connectionStage}
+          // Always null here — this page redirects to the Connection page
+          // above as soon as lead.connection exists.
+          connectionStage={null}
           basePath={`/admin/leads/${id}`}
           customerName={lead.customerName}
           phone={lead.phone}
@@ -219,17 +205,7 @@ export default async function LeadDetailPage({
             {lead.email && <span>{lead.email}</span>}
           </>
         }
-        actions={
-          lead.connection ? (
-            <Link href={`/admin/connections/${lead.connection.id}`}>
-              <Button variant="outline" size="sm">
-                View customer →
-              </Button>
-            </Link>
-          ) : (
-            <StatusBadge tone={LEAD_STAGE_TONE[lead.stage]} label={lead.stage.replace("_", " ")} />
-          )
-        }
+        actions={<StatusBadge tone={LEAD_STAGE_TONE[lead.stage]} label={lead.stage.replace("_", " ")} />}
       />
 
       <CustomerTabs
@@ -237,12 +213,12 @@ export default async function LeadDetailPage({
         overview={overviewSection}
         lead={leadSection}
         estimate={estimateSection}
-        sitevisit={customerOnlyTabContent}
-        documents={customerOnlyTabContent}
-        subsidyloan={customerOnlyTabContent}
-        installation={customerOnlyTabContent}
-        invoice={customerOnlyTabContent}
-        warranty={customerOnlyTabContent}
+        sitevisit={NOT_YET_A_CUSTOMER}
+        documents={NOT_YET_A_CUSTOMER}
+        subsidyloan={NOT_YET_A_CUSTOMER}
+        installation={NOT_YET_A_CUSTOMER}
+        invoice={NOT_YET_A_CUSTOMER}
+        warranty={NOT_YET_A_CUSTOMER}
         activity={activitySection}
       />
     </div>
