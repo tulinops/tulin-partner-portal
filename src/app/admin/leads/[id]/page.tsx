@@ -155,7 +155,6 @@ export default async function LeadDetailPage({
           estimates={lead.estimates}
           activeEstimateId={activeEstimateId}
           connectionStage={connectionStage}
-          hasConnection={!!lead.connection}
           basePath={`/admin/leads/${id}`}
           customerName={lead.customerName}
           phone={lead.phone}

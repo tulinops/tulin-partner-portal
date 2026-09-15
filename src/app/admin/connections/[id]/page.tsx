@@ -603,7 +603,6 @@ export default async function ConnectionDetailPage({
           estimates={connection.lead.estimates}
           activeEstimateId={activeEstimateId}
           connectionStage={stage}
-          hasConnection
           basePath={`/admin/connections/${id}`}
           customerName={connection.lead.customerName}
           phone={connection.lead.phone}

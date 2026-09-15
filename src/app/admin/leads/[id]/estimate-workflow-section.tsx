@@ -6,7 +6,6 @@ import {
   deleteEstimate,
   updateEstimateStatus,
   updateEstimateFields,
-  scheduleSiteVisit,
   type EstimateLineItem,
   type getLead,
 } from "@/server/leads";
@@ -103,7 +102,6 @@ export async function EstimateWorkflowSection({
   estimates,
   activeEstimateId,
   connectionStage,
-  hasConnection,
   basePath,
   customerName,
   phone,
@@ -119,7 +117,6 @@ export async function EstimateWorkflowSection({
   estimates: EstimateRecord[];
   activeEstimateId?: string;
   connectionStage: ConnectionStageKey | null;
-  hasConnection: boolean;
   basePath: string;
   customerName: string;
   phone: string;
@@ -182,11 +179,6 @@ export async function EstimateWorkflowSection({
   async function statusAction(formData: FormData) {
     "use server";
     await updateEstimateStatus(active.id, formData.get("status") as EstimateStatus);
-  }
-
-  async function scheduleSiteVisitAction() {
-    "use server";
-    await scheduleSiteVisit(leadId);
   }
 
   async function saveFieldsAction(formData: FormData) {
@@ -291,9 +283,15 @@ export async function EstimateWorkflowSection({
             </SelectContent>
           </Select>
         </div>
-        <Button type="submit" size="sm" disabled={stageAdvanced}>
+        <ConfirmSubmitButton
+          type="submit"
+          size="sm"
+          disabled={stageAdvanced}
+          confirmMessage="Approving this quotation will convert the lead into a customer and can't be undone from here. Continue?"
+          confirmIf={(formData) => formData.get("status") === "ACCEPTED" && connectionStage === null}
+        >
           Update status
-        </Button>
+        </ConfirmSubmitButton>
       </form>
 
       <form action={saveFieldsAction} className="space-y-4">
@@ -334,17 +332,6 @@ export async function EstimateWorkflowSection({
         />
         {!locked && <Button type="submit">Save changes</Button>}
       </form>
-
-      {isActiveFinal && !hasConnection && (connectionStage === "lead" || connectionStage === "estimate" || connectionStage === null) && (
-        <form action={scheduleSiteVisitAction}>
-          <ConfirmSubmitButton
-            type="submit"
-            confirmMessage="This will convert the lead into a customer and can't be undone from here. Continue?"
-          >
-            Schedule site visit →
-          </ConfirmSubmitButton>
-        </form>
-      )}
     </div>
   );
 }

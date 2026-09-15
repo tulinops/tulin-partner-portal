@@ -72,10 +72,10 @@ export async function updateLeadDetails(input: {
 // itself, so it's derived here rather than reusing that type directly.
 type TenantTxClient = Parameters<Parameters<TenantScopedClient["$transaction"]>[0]>[0];
 
-// Shared by moveLeadStage("WON") and scheduleSiteVisit() — both are really
-// "start the customer journey" triggered from different places in the UI,
-// so they must produce the identical Connection, not two slightly-different
-// paths to the same outcome.
+// Shared by moveLeadStage("WON") and updateEstimateStatus("ACCEPTED") — both
+// are really "start the customer journey" triggered from different places in
+// the UI, so they must produce the identical Connection, not two
+// slightly-different paths to the same outcome.
 async function createConnectionFromLead(
   tx: TenantTxClient,
   lead: { id: string; customerName: string; phone: string; address: string | null },
@@ -96,9 +96,9 @@ async function createConnectionFromLead(
 }
 
 // "WON" is deliberately excluded here — it's only ever set as a byproduct of
-// scheduleSiteVisit() actually creating the Connection (via
-// createConnectionFromLead), which requires an approved quotation first. A
-// manual stage button bypassed that guard, so Won can no longer be set this way.
+// approving a quotation (updateEstimateStatus -> "ACCEPTED") actually
+// creating the Connection (via createConnectionFromLead). A manual stage
+// button bypassed that guard, so Won can no longer be set this way.
 export async function moveLeadStage(leadId: string, stage: Exclude<LeadStage, "WON">) {
   const { db } = await getTenantDb();
   const lead = await db.lead.findFirst({ where: { id: leadId }, include: { connection: true } });
@@ -113,30 +113,6 @@ export async function moveLeadStage(leadId: string, stage: Exclude<LeadStage, "W
   await db.lead.update({ where: { id: leadId }, data: { stage } });
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);
-}
-
-// The "Schedule site visit →" action from the Estimate tab — the other path
-// (besides marking a lead Won) that starts the customer journey, once a
-// quotation has been approved. A no-op if the Connection already exists.
-export async function scheduleSiteVisit(leadId: string) {
-  const { db, tenantId } = await getTenantDb();
-  const lead = await db.lead.findFirst({
-    where: { id: leadId },
-    include: { connection: true, estimates: { where: { isCurrent: true }, take: 1 } },
-  });
-  if (!lead) throw new Error("Lead not found");
-  if (lead.connection) return;
-
-  const finalEstimate = lead.estimates[0];
-  if (!finalEstimate) throw new Error("Approve a quotation before scheduling the site visit");
-
-  const systemSizeKw = finalEstimate.systemSizeKw;
-  await db.$transaction((tx) =>
-    createConnectionFromLead(tx, lead, tenantId, systemSizeKw ? Number(systemSizeKw) : undefined),
-  );
-  revalidatePath("/admin/leads");
-  revalidatePath(`/admin/leads/${leadId}`);
-  revalidatePath("/admin/connections");
 }
 
 export async function addLeadNote(input: {
@@ -377,10 +353,16 @@ async function assertEstimateStatusChangeAllowed(estimate: { leadId: string; sta
 // Approving a quote (status -> ACCEPTED) is what makes it the lead's final
 // quotation: it becomes isCurrent, and any previously-final quote is demoted
 // back to SENT and loses isCurrent, matching the mockup's
-// onEstStatusChange/"Approved" behavior.
+// onEstStatusChange/"Approved" behavior. It also converts the lead into a
+// customer in the same transaction — approval is the one moment that used
+// to require a separate "Schedule site visit" click, which was an easy
+// irreversible action to trigger by accident right after approving.
 export async function updateEstimateStatus(estimateId: string, status: EstimateStatus) {
-  const { db } = await getTenantDb();
-  const estimate = await db.estimate.findFirst({ where: { id: estimateId } });
+  const { db, tenantId } = await getTenantDb();
+  const estimate = await db.estimate.findFirst({
+    where: { id: estimateId },
+    include: { lead: { include: { connection: true } } },
+  });
   if (!estimate) throw new Error("Estimate not found");
   await assertEstimateStatusChangeAllowed(estimate);
 
@@ -391,6 +373,15 @@ export async function updateEstimateStatus(estimateId: string, status: EstimateS
         data: { isCurrent: false, status: "SENT" },
       });
       await tx.estimate.update({ where: { id: estimateId }, data: { status: "ACCEPTED", isCurrent: true } });
+
+      if (!estimate.lead.connection) {
+        await createConnectionFromLead(
+          tx,
+          estimate.lead,
+          tenantId,
+          estimate.systemSizeKw ? Number(estimate.systemSizeKw) : undefined,
+        );
+      }
     });
   } else {
     await db.estimate.update({ where: { id: estimateId }, data: { status } });
@@ -398,6 +389,8 @@ export async function updateEstimateStatus(estimateId: string, status: EstimateS
 
   revalidatePath(`/admin/leads/${estimate.leadId}`);
   revalidatePath(`/admin/estimates/${estimateId}`);
+  revalidatePath("/admin/leads");
+  revalidatePath("/admin/connections");
 }
 
 // Refuses to leave a lead with zero quotations — there must always be at
