@@ -288,7 +288,8 @@ export async function EstimateWorkflowSection({
           size="sm"
           disabled={stageAdvanced}
           confirmMessage="Approving this quotation will convert the lead into a customer and can't be undone from here. Continue?"
-          confirmIf={(formData) => formData.get("status") === "ACCEPTED" && connectionStage === null}
+          confirmWhenFieldEquals={{ name: "status", value: "ACCEPTED" }}
+          skipConfirm={connectionStage !== null}
         >
           Update status
         </ConfirmSubmitButton>
