@@ -1,14 +1,17 @@
+import { X } from "lucide-react";
 import {
   listRequiredDocumentTypes,
   createRequiredDocumentType,
-  updateRequiredDocumentType,
+  deleteRequiredDocumentType,
 } from "@/server/documents";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ActionForm } from "@/components/action-form";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { DocumentTypeStatusToggle } from "./status-toggle";
 import {
   Table,
   TableBody,
@@ -26,12 +29,9 @@ async function createAction(formData: FormData) {
   });
 }
 
-async function toggleActiveAction(formData: FormData) {
+async function deleteAction(formData: FormData) {
   "use server";
-  await updateRequiredDocumentType({
-    id: String(formData.get("id")),
-    isActive: formData.get("isActive") === "true",
-  });
+  await deleteRequiredDocumentType(String(formData.get("id")));
 }
 
 export default async function RequiredDocumentsPage() {
@@ -50,7 +50,7 @@ export default async function RequiredDocumentsPage() {
           <CardTitle>Add document type</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createAction} className="grid gap-4 sm:grid-cols-3">
+          <ActionForm action={createAction} successMessage="Document type added" className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" name="name" required placeholder="e.g. Identity proof" />
@@ -62,7 +62,7 @@ export default async function RequiredDocumentsPage() {
             <div className="flex items-end">
               <Button type="submit">Add</Button>
             </div>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -86,16 +86,22 @@ export default async function RequiredDocumentsPage() {
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell className="text-muted-foreground">{t.description ?? "—"}</TableCell>
                   <TableCell>
-                    <StatusBadge tone={t.isActive ? "done" : "neutral"} label={t.isActive ? "Active" : "Retired"} />
+                    <DocumentTypeStatusToggle id={t.id} initialActive={t.isActive} />
                   </TableCell>
                   <TableCell>
-                    <form action={toggleActiveAction}>
+                    <ActionForm action={deleteAction} successMessage="Document type deleted">
                       <input type="hidden" name="id" value={t.id} />
-                      <input type="hidden" name="isActive" value={String(!t.isActive)} />
-                      <Button type="submit" variant="ghost" size="sm">
-                        {t.isActive ? "Retire" : "Reactivate"}
-                      </Button>
-                    </form>
+                      <ConfirmSubmitButton
+                        type="submit"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        title={`Delete ${t.name}`}
+                        confirmMessage={`Delete "${t.name}"? This can't be undone. Connections that already have this document on file will block the delete — retire it instead if that's the case.`}
+                      >
+                        <X />
+                      </ConfirmSubmitButton>
+                    </ActionForm>
                   </TableCell>
                 </TableRow>
               ))}

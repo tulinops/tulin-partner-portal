@@ -50,6 +50,20 @@ export async function updateRequiredDocumentType(input: {
   revalidatePath("/admin/settings/documents");
 }
 
+export async function deleteRequiredDocumentType(id: string) {
+  const { db } = await getTenantDb();
+  const type = await db.requiredDocumentType.findFirst({ where: { id } });
+  if (!type) throw new Error("Document type not found");
+
+  const inUseCount = await db.connectionDocument.count({ where: { requiredDocumentTypeId: id } });
+  if (inUseCount > 0) {
+    throw new Error(`Cannot delete — ${inUseCount} connection(s) already have this document on file. Retire it instead.`);
+  }
+
+  await db.requiredDocumentType.delete({ where: { id } });
+  revalidatePath("/admin/settings/documents");
+}
+
 /**
  * Idempotent: creates a NOT_UPLOADED ConnectionDocument for every active
  * RequiredDocumentType this tenant has that the connection doesn't already
