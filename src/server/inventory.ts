@@ -13,13 +13,56 @@ export async function listInventoryItems() {
 
 export async function createInventoryItem(input: {
   name: string;
+  brand?: string;
   unit?: string;
   supplier?: string;
 }) {
   const { db, tenantId } = await getTenantDb();
   await db.inventoryItem.create({
-    data: { tenantId, name: input.name, unit: input.unit || "pcs", supplier: input.supplier },
+    data: {
+      tenantId,
+      name: input.name,
+      brand: input.brand,
+      unit: input.unit || "pcs",
+      supplier: input.supplier,
+    },
   });
+  revalidatePath("/admin/inventory");
+}
+
+// Metadata only — runningStock is a derived ledger balance (see
+// recordPurchase / recordInstallationSignOff's auto-deduction), never
+// edited directly here, so it can't drift from its PURCHASE/ALLOCATION
+// transaction history.
+export async function updateInventoryItem(input: {
+  id: string;
+  name: string;
+  brand?: string;
+  unit: string;
+  supplier?: string;
+}) {
+  const { db } = await getTenantDb();
+  const item = await db.inventoryItem.findFirst({ where: { id: input.id } });
+  if (!item) throw new Error("Inventory item not found");
+
+  await db.inventoryItem.update({
+    where: { id: input.id },
+    data: { name: input.name, brand: input.brand, unit: input.unit || "pcs", supplier: input.supplier },
+  });
+  revalidatePath("/admin/inventory");
+}
+
+export async function deleteInventoryItem(id: string) {
+  const { db } = await getTenantDb();
+  const item = await db.inventoryItem.findFirst({ where: { id } });
+  if (!item) throw new Error("Inventory item not found");
+
+  const txnCount = await db.inventoryTransaction.count({ where: { inventoryItemId: id } });
+  if (txnCount > 0) {
+    throw new Error(`Cannot delete — this item has ${txnCount} purchase/allocation record(s) on file.`);
+  }
+
+  await db.inventoryItem.delete({ where: { id } });
   revalidatePath("/admin/inventory");
 }
 
@@ -28,6 +71,7 @@ export async function recordPurchase(input: {
   quantity: number;
   unitCost: number;
   supplier?: string;
+  brand?: string;
   purchaseDate?: Date;
 }) {
   const { db, tenantId } = await getTenantDb();
@@ -46,6 +90,10 @@ export async function recordPurchase(input: {
         quantity: input.quantity,
         unitCost: input.unitCost,
         supplier: input.supplier,
+        // Falls back to the item's own brand so a purchase's brand is
+        // rarely blank — only override this when the batch actually came
+        // from a different brand than the item's default.
+        brand: input.brand || item.brand || undefined,
         purchaseDate: input.purchaseDate ?? new Date(),
       },
     });
