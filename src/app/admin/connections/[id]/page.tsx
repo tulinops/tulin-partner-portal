@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { X } from "lucide-react";
 import {
   getConnectionDetail,
   recordPayment,
@@ -14,6 +15,7 @@ import {
   updateInstalledEquipment,
   recordInstallationSignOff,
   createWarrantyRecord,
+  deleteWarrantyRecord,
   type SiteInspectionDetails,
   type InstalledEquipmentItem,
 } from "@/server/connections";
@@ -30,6 +32,7 @@ import { FinancingMethodSelect } from "./financing-method-select";
 import { WarrantyRecordForm } from "./warranty-record-form";
 import { AddWarrantyDialog } from "./add-warranty-dialog";
 import { WarrantyRecordView } from "./warranty-record-view";
+import { EditWarrantyDialog } from "./edit-warranty-dialog";
 import { InvoiceItemsEditor } from "./invoice-items-editor";
 import { generateInvoice, updateInvoice, type InvoiceLineItem } from "@/server/invoices";
 import { EstimateWorkflowSection } from "@/app/admin/leads/[id]/estimate-workflow-section";
@@ -53,6 +56,7 @@ import { StatusBadge, CONNECTION_STATUS_TONE } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ActionForm } from "@/components/action-form";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import {
   Select,
   SelectContent,
@@ -355,6 +359,14 @@ export default async function ConnectionDetailPage({
       startDate: new Date(String(formData.get("startDate"))),
       periodMonths: Number(formData.get("periodMonths")),
       terms: String(formData.get("terms") || "") || undefined,
+    });
+  }
+
+  async function warrantyDeleteAction(formData: FormData) {
+    "use server";
+    await deleteWarrantyRecord({
+      id: String(formData.get("id")),
+      connectionId: id,
     });
   }
 
@@ -1386,20 +1398,50 @@ export default async function ConnectionDetailPage({
                 </TableCell>
                 <TableCell>{w.expiryDate.toLocaleDateString("en-IN")}</TableCell>
                 <TableCell>
-                  <WarrantyRecordView
-                    record={{
-                      productName: w.productName,
-                      equipmentType: w.equipmentType,
-                      manufacturer: w.manufacturer,
-                      model: w.model,
-                      serialNumber: w.serialNumber,
-                      warrantyType: w.warrantyType,
-                      periodMonths: w.periodMonths,
-                      startDate: w.startDate.toLocaleDateString("en-IN"),
-                      expiryDate: w.expiryDate.toLocaleDateString("en-IN"),
-                      terms: w.terms,
-                    }}
-                  />
+                  <div className="flex items-center gap-1">
+                    <WarrantyRecordView
+                      record={{
+                        productName: w.productName,
+                        equipmentType: w.equipmentType,
+                        manufacturer: w.manufacturer,
+                        model: w.model,
+                        serialNumber: w.serialNumber,
+                        warrantyType: w.warrantyType,
+                        periodMonths: w.periodMonths,
+                        startDate: w.startDate.toLocaleDateString("en-IN"),
+                        expiryDate: w.expiryDate.toLocaleDateString("en-IN"),
+                        terms: w.terms,
+                      }}
+                    />
+                    <EditWarrantyDialog
+                      record={{
+                        id: w.id,
+                        connectionId: id,
+                        equipmentType: w.equipmentType,
+                        productName: w.productName,
+                        manufacturer: w.manufacturer,
+                        model: w.model,
+                        serialNumber: w.serialNumber,
+                        warrantyType: w.warrantyType,
+                        startDate: dateInputValue(w.startDate),
+                        periodMonths: w.periodMonths,
+                        terms: w.terms,
+                      }}
+                    />
+                    <ActionForm action={warrantyDeleteAction} successMessage="Warranty record deleted">
+                      <input type="hidden" name="id" value={w.id} />
+                      <ConfirmSubmitButton
+                        type="submit"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        title={`Delete ${w.productName}`}
+                        confirmMessage={`Delete the warranty record for "${w.productName}"? This can't be undone.`}
+                      >
+                        <X />
+                      </ConfirmSubmitButton>
+                    </ActionForm>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

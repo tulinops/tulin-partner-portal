@@ -637,3 +637,50 @@ export async function createWarrantyRecord(input: {
   });
   revalidatePath(`/admin/connections/${input.connectionId}`);
 }
+
+export async function updateWarrantyRecord(input: {
+  id: string;
+  connectionId: string;
+  equipmentType: EquipmentType;
+  productName: string;
+  manufacturer?: string;
+  model?: string;
+  serialNumber?: string;
+  warrantyType?: WarrantyType;
+  startDate: Date;
+  periodMonths: number;
+  terms?: string;
+}) {
+  const { db } = await getTenantDb();
+  const record = await db.warrantyRecord.findFirst({
+    where: { id: input.id, connectionId: input.connectionId },
+  });
+  if (!record) throw new Error("Warranty record not found");
+
+  await db.warrantyRecord.update({
+    where: { id: input.id },
+    data: {
+      equipmentType: input.equipmentType,
+      productName: input.productName,
+      manufacturer: input.manufacturer,
+      model: input.model,
+      serialNumber: input.serialNumber,
+      warrantyType: input.warrantyType,
+      startDate: input.startDate,
+      periodMonths: input.periodMonths,
+      terms: input.terms,
+    },
+  });
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
+
+export async function deleteWarrantyRecord(input: { id: string; connectionId: string }) {
+  const { db } = await getTenantDb();
+  const record = await db.warrantyRecord.findFirst({
+    where: { id: input.id, connectionId: input.connectionId },
+  });
+  if (!record) throw new Error("Warranty record not found");
+
+  await db.warrantyRecord.delete({ where: { id: input.id } });
+  revalidatePath(`/admin/connections/${input.connectionId}`);
+}
