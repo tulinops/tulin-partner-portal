@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
 import { requireAdmin } from "@/lib/permissions";
@@ -85,6 +85,12 @@ export async function updateDocumentStatus(input: {
   const { db } = await getTenantDb();
   const doc = await db.connectionDocument.findFirst({ where: { id: input.connectionDocumentId } });
   if (!doc) throw new Error("Document not found");
+  if (!doc.filePath && input.status !== "NOT_UPLOADED") {
+    throw new Error("Cannot set this status before a file is uploaded");
+  }
+  if (doc.filePath && input.status === "NOT_UPLOADED") {
+    throw new Error("Cannot set status back to Not uploaded once a file exists");
+  }
 
   await db.connectionDocument.update({
     where: { id: input.connectionDocumentId },
@@ -119,6 +125,8 @@ export async function uploadConnectionDocument(formData: FormData) {
   const bytes = Buffer.from(await file.arrayBuffer());
   const blob = await put(pathname, bytes, { access: "public", contentType: file.type });
 
+  const previousFilePath = doc.filePath;
+
   await db.connectionDocument.update({
     where: { id: connectionDocumentId },
     data: {
@@ -129,5 +137,12 @@ export async function uploadConnectionDocument(formData: FormData) {
       status: "UPLOADED",
     },
   });
+
+  // Delete the replaced file only after the DB points at the new one, so a
+  // delete failure never leaves the document referencing nothing.
+  if (previousFilePath) {
+    await del(previousFilePath).catch(() => {});
+  }
+
   revalidatePath(`/admin/connections/${doc.connectionId}`);
 }

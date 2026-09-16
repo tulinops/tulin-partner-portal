@@ -18,16 +18,13 @@ import {
   type SiteInspectionDetails,
   type InstalledEquipmentItem,
 } from "@/server/connections";
-import {
-  ensureConnectionDocuments,
-  updateDocumentStatus,
-  uploadConnectionDocument,
-} from "@/server/documents";
+import { ensureConnectionDocuments } from "@/server/documents";
 import { listInventoryItems, allocateToConnection } from "@/server/inventory";
 import { listStaffMembers } from "@/server/staff";
 import { addLeadNote, type EstimateLineItem } from "@/server/leads";
 import { getBusinessProfile } from "@/server/business-profile";
 import { SitePhotos } from "./site-photos";
+import { DocumentRow } from "./document-row";
 import { CustomerTabs } from "./customer-tabs";
 import { InstalledEquipmentEditor } from "./installed-equipment-editor";
 import { WarrantyRecordForm } from "./warranty-record-form";
@@ -47,7 +44,6 @@ import type {
   InstallationStatus,
   EquipmentType,
   WarrantyType,
-  DocumentStatus,
 } from "@/generated/prisma/enums";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,15 +91,6 @@ const SITE_VISIT_RESULTS = [
 const ROOF_TYPES = ["RCC", "TIN", "TILED", "OTHER"] as const;
 const ROOF_CONDITIONS = ["GOOD", "NEEDS_REPAIR", "POOR"] as const;
 const ROOF_ACCESS_OPTIONS = ["EASY", "LADDER_REQUIRED", "DIFFICULT"] as const;
-
-const DOCUMENT_STATUSES = [
-  "NOT_UPLOADED",
-  "UPLOADED",
-  "UNDER_REVIEW",
-  "VERIFIED",
-  "REJECTED",
-  "REUPLOAD_REQUIRED",
-] as const;
 
 const LOAN_STATUSES = [
   "APPLICATION_PENDING",
@@ -160,10 +147,6 @@ function money(n: number) {
 
 function dateInputValue(d: Date | null | undefined) {
   return d ? d.toISOString().slice(0, 10) : "";
-}
-
-function isImageFile(path: string) {
-  return /\.(jpe?g|png|gif|webp|bmp|avif)$/i.test(path);
 }
 
 export default async function ConnectionDetailPage({
@@ -251,20 +234,6 @@ export default async function ConnectionDetailPage({
       result: formData.get("result") as SiteVisitResult,
       workerNotes: String(formData.get("workerNotes") || "") || undefined,
     });
-  }
-
-  async function documentStatusAction(formData: FormData) {
-    "use server";
-    await updateDocumentStatus({
-      connectionDocumentId: String(formData.get("connectionDocumentId")),
-      status: formData.get("status") as DocumentStatus,
-      remarks: String(formData.get("remarks") || "") || undefined,
-    });
-  }
-
-  async function uploadDocumentAction(formData: FormData) {
-    "use server";
-    await uploadConnectionDocument(formData);
   }
 
   async function subsidyAction(formData: FormData) {
@@ -884,71 +853,7 @@ export default async function ConnectionDetailPage({
           .
         </p>
         {connection.connectionDocuments.map((doc) => (
-          <div key={doc.id} className="space-y-2 border-b pb-3 last:border-b-0">
-            <form action={documentStatusAction} className="grid items-end gap-3 sm:grid-cols-4">
-              <input type="hidden" name="connectionDocumentId" value={doc.id} />
-              <div className="sm:col-span-1">
-                <Label className="font-normal">{doc.requiredDocumentType.name}</Label>
-              </div>
-              <div className="space-y-2">
-                {/* Keyed so this re-syncs after uploadDocumentAction
-                    auto-sets status to UPLOADED as a side effect of the
-                    separate upload form below — same stale-Select issue
-                    already fixed for the site visit/installation status
-                    dropdowns. Without this, saving this form afterward (even
-                    just to add a remark) resubmits the stale pre-upload
-                    value and reverts the status right back. */}
-                <Select key={doc.updatedAt.getTime()} name="status" defaultValue={doc.status}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DOCUMENT_STATUSES.map((s) => (
-                      <SelectItem key={s} value={s}>
-                        {s.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Input name="remarks" placeholder="Remarks" defaultValue={doc.remarks ?? ""} />
-              </div>
-              <div>
-                <Button type="submit" size="sm">
-                  Save
-                </Button>
-              </div>
-            </form>
-            {doc.filePath && isImageFile(doc.filePath) && (
-              <a href={doc.filePath} target="_blank" rel="noreferrer" className="inline-block">
-                {/* eslint-disable-next-line @next/next/no-img-element -- Vercel Blob URL, not an optimizable remote asset */}
-                <img
-                  src={doc.filePath}
-                  alt={doc.originalName ?? "Uploaded document"}
-                  className="h-20 w-20 rounded border object-cover"
-                />
-              </a>
-            )}
-            <form action={uploadDocumentAction} className="flex flex-wrap items-center gap-2 text-sm">
-              <input type="hidden" name="connectionDocumentId" value={doc.id} />
-              <input type="file" name="file" accept="image/*,application/pdf" required className="text-xs" />
-              <Button type="submit" size="sm" variant="outline">
-                Upload file
-              </Button>
-              {doc.filePath && (
-                <a
-                  href={doc.filePath}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-xs text-muted-foreground underline underline-offset-4"
-                >
-                  {isImageFile(doc.filePath) ? "View full size" : "View current file"}
-                  {doc.originalName ? ` (${doc.originalName})` : ""}
-                </a>
-              )}
-            </form>
-          </div>
+          <DocumentRow key={doc.id} doc={doc} />
         ))}
         {connection.connectionDocuments.length === 0 && (
           <p className="text-sm text-muted-foreground">
