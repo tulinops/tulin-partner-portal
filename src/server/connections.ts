@@ -162,6 +162,12 @@ export type InstalledEquipmentItem = {
   serialNumber?: string;
   quantity: number;
   notes?: string;
+  // Which stock item this row was actually pulled from — a tenant can stock
+  // several SKUs for the same EquipmentType, so this can't be inferred
+  // automatically and is picked explicitly per row on the Installation tab.
+  // Rows without one (e.g. anything not tracked in Inventory) are simply
+  // skipped by the auto-deduction in recordInstallationSignOff.
+  inventoryItemId?: string;
 };
 
 export async function recordPayment(input: {
@@ -500,48 +506,99 @@ export async function updateInstalledEquipment(input: { connectionId: string; it
 
 export async function recordInstallationSignOff(input: { connectionId: string; signedOffByName: string; notes?: string }) {
   const { db, tenantId } = await getTenantDb();
-  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
-  if (!connection) throw new Error("Connection not found");
 
-  await db.connection.update({
-    where: { id: input.connectionId },
-    data: {
-      installationSignedOffAt: new Date(),
-      installationSignedOffByName: input.signedOffByName,
-      installationNotes: input.notes,
-      installationStatus: "COMPLETED",
-      status: connection.status === "INSTALLATION_IN_PROGRESS" ? "COMPLETED" : connection.status,
-    },
-  });
+  await db.$transaction(async (tx) => {
+    const connection = await tx.connection.findFirst({ where: { id: input.connectionId } });
+    if (!connection) throw new Error("Connection not found");
+    const alreadySignedOff = connection.installationSignedOffAt !== null;
 
-  // Auto-create sensible default warranty records from the installed
-  // equipment, per product type — a convenience, not a hard requirement;
-  // fully editable afterward. Skips types that already have a record.
-  const equipment = (connection.installedEquipment ?? []) as InstalledEquipmentItem[];
-  const existing = await db.warrantyRecord.findMany({ where: { connectionId: input.connectionId } });
-  const existingTypes = new Set(existing.map((w) => w.equipmentType));
-  const defaults: { type: EquipmentType; months: number }[] = [
-    { type: "PANEL", months: 300 },
-    { type: "INVERTER", months: 96 },
-  ];
-  for (const { type, months } of defaults) {
-    const item = equipment.find((e) => e.type === type);
-    if (!item || existingTypes.has(type)) continue;
-    await db.warrantyRecord.create({
+    await tx.connection.update({
+      where: { id: input.connectionId },
       data: {
-        tenantId,
-        connectionId: input.connectionId,
-        equipmentType: type,
-        productName: type === "PANEL" ? "Solar Panels" : "Inverter",
-        manufacturer: item.brand,
-        model: item.model,
-        serialNumber: type === "INVERTER" ? item.serialNumber : undefined,
-        startDate: new Date(),
-        periodMonths: months,
+        installationSignedOffAt: new Date(),
+        installationSignedOffByName: input.signedOffByName,
+        installationNotes: input.notes,
+        installationStatus: "COMPLETED",
+        status: connection.status === "INSTALLATION_IN_PROGRESS" ? "COMPLETED" : connection.status,
       },
     });
-  }
 
+    const equipment = (connection.installedEquipment ?? []) as InstalledEquipmentItem[];
+
+    // Auto-create sensible default warranty records from the installed
+    // equipment, per product type — a convenience, not a hard requirement;
+    // fully editable afterward. Skips types that already have a record.
+    const existing = await tx.warrantyRecord.findMany({ where: { connectionId: input.connectionId } });
+    const existingTypes = new Set(existing.map((w) => w.equipmentType));
+    const defaults: { type: EquipmentType; months: number }[] = [
+      { type: "PANEL", months: 300 },
+      { type: "INVERTER", months: 96 },
+    ];
+    for (const { type, months } of defaults) {
+      const item = equipment.find((e) => e.type === type);
+      if (!item || existingTypes.has(type)) continue;
+      await tx.warrantyRecord.create({
+        data: {
+          tenantId,
+          connectionId: input.connectionId,
+          equipmentType: type,
+          productName: type === "PANEL" ? "Solar Panels" : "Inverter",
+          manufacturer: item.brand,
+          model: item.model,
+          serialNumber: type === "INVERTER" ? item.serialNumber : undefined,
+          startDate: new Date(),
+          periodMonths: months,
+        },
+      });
+    }
+
+    // Auto-deduct each installed-equipment row that was matched to a stock
+    // item (see InstalledEquipmentItem.inventoryItemId) — once only, on the
+    // first sign-off, so re-submitting "Mark installation complete" never
+    // double-deducts. Unmatched rows (nothing tracked in Inventory for that
+    // item) are simply skipped, same as before this existed.
+    if (!alreadySignedOff) {
+      for (const item of equipment) {
+        if (!item.inventoryItemId || !(item.quantity > 0)) continue;
+
+        const invItem = await tx.inventoryItem.findFirst({ where: { id: item.inventoryItemId } });
+        if (!invItem) throw new Error(`Inventory item for ${item.type} not found`);
+        if (Number(invItem.runningStock) < item.quantity) {
+          throw new Error(`Not enough stock for ${invItem.name}: ${invItem.runningStock} ${invItem.unit} available`);
+        }
+
+        // Weighted-average purchase cost snapshotted onto this allocation —
+        // same approach as the (now-removed) manual "Allocate inventory" form.
+        const purchases = await tx.inventoryTransaction.findMany({
+          where: { inventoryItemId: invItem.id, type: "PURCHASE" },
+          select: { quantity: true, unitCost: true },
+        });
+        const totalPurchasedQty = purchases.reduce((sum, p) => sum + Number(p.quantity), 0);
+        const totalPurchasedCost = purchases.reduce(
+          (sum, p) => sum + Number(p.quantity) * Number(p.unitCost ?? 0),
+          0,
+        );
+        const avgUnitCost = totalPurchasedQty > 0 ? totalPurchasedCost / totalPurchasedQty : 0;
+
+        await tx.inventoryTransaction.create({
+          data: {
+            tenantId,
+            inventoryItemId: invItem.id,
+            connectionId: input.connectionId,
+            type: "ALLOCATION",
+            quantity: item.quantity,
+            unitCost: avgUnitCost,
+          },
+        });
+        await tx.inventoryItem.update({
+          where: { id: invItem.id },
+          data: { runningStock: { decrement: item.quantity } },
+        });
+      }
+    }
+  });
+
+  revalidatePath("/admin/inventory");
   revalidatePath(`/admin/connections/${input.connectionId}`);
 }
 

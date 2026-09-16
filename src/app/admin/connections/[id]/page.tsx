@@ -19,7 +19,7 @@ import {
   type InstalledEquipmentItem,
 } from "@/server/connections";
 import { ensureConnectionDocuments } from "@/server/documents";
-import { listInventoryItems, allocateToConnection } from "@/server/inventory";
+import { listInventoryItems } from "@/server/inventory";
 import { listStaffMembers } from "@/server/staff";
 import { addLeadNote, type EstimateLineItem } from "@/server/leads";
 import { getBusinessProfile } from "@/server/business-profile";
@@ -173,18 +173,17 @@ export default async function ConnectionDetailPage({
     stage,
   } = detail;
   const items = await listInventoryItems();
+  // Decimal -> number so this can cross the server/client boundary as a
+  // plain prop into InstalledEquipmentEditor.
+  const inventoryItemOptions = items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    unit: item.unit,
+    runningStock: Number(item.runningStock),
+  }));
   const staff = await listStaffMembers();
   const tenant = await getBusinessProfile();
   const inspection = siteInspectionDetails ?? ({} as SiteInspectionDetails);
-
-  async function allocateAction(formData: FormData) {
-    "use server";
-    await allocateToConnection({
-      connectionId: id,
-      inventoryItemId: String(formData.get("inventoryItemId")),
-      quantity: Number(formData.get("quantity")),
-    });
-  }
 
   async function recordPaymentAction(formData: FormData) {
     "use server";
@@ -320,6 +319,7 @@ export default async function ConnectionDetailPage({
         model: String(formData.get(`equip_${i}_model`) || "") || undefined,
         serialNumber: String(formData.get(`equip_${i}_serial`) || "") || undefined,
         quantity: Number(formData.get(`equip_${i}_qty`) || 1),
+        inventoryItemId: String(formData.get(`equip_${i}_inventoryItemId`) || "") || undefined,
       });
     }
     await updateInstalledEquipment({ connectionId: id, items });
@@ -1188,12 +1188,15 @@ export default async function ConnectionDetailPage({
 
   // Pre-fill from the approved quotation only while nothing has been saved
   // yet — once the installer saves anything, that's what future loads show,
-  // never silently overwritten by the quotation again.
+  // never silently overwritten by the quotation again. estimateEquipmentItems
+  // is also handed to the editor directly so its "Refill from estimate"
+  // button can pull the quotation in on demand even after that point.
   const finalEstimateLineItems = (finalEstimate?.lineItems as unknown as EstimateLineItem[] | null) ?? [];
-  const equipmentInitialRows =
-    installedEquipment.length > 0
-      ? installedEquipment
-      : buildEquipmentFromEstimateLineItems(finalEstimateLineItems, brandLabel(finalEstimate?.brand));
+  const estimateEquipmentItems = buildEquipmentFromEstimateLineItems(
+    finalEstimateLineItems,
+    brandLabel(finalEstimate?.brand),
+  );
+  const equipmentInitialRows = installedEquipment.length > 0 ? installedEquipment : estimateEquipmentItems;
 
   const installationSection = (
     <div className="space-y-6">
@@ -1235,7 +1238,12 @@ export default async function ConnectionDetailPage({
               {/* Forces a remount after every save so edits (brand, serial
                   numbers, etc.) don't look like they vanished — same
                   stale-client-state issue fixed for the Estimate/Invoice editors. */}
-              <InstalledEquipmentEditor key={connection.updatedAt.getTime()} initialItems={equipmentInitialRows} />
+              <InstalledEquipmentEditor
+                key={connection.updatedAt.getTime()}
+                initialItems={equipmentInitialRows}
+                estimateItems={estimateEquipmentItems}
+                inventoryItems={inventoryItemOptions}
+              />
               <Button type="submit" size="sm">
                 Save
               </Button>
@@ -1269,51 +1277,22 @@ export default async function ConnectionDetailPage({
         </CardContent>
       </Card>
 
-      {items.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Allocate inventory</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form action={allocateAction} className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="inventoryItemId">Item</Label>
-                <Select name="inventoryItemId" required>
-                  <SelectTrigger id="inventoryItemId">
-                    <SelectValue placeholder="Select item" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {items.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name} ({item.runningStock.toString()} {item.unit} available)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="quantity">Quantity</Label>
-                <Input id="quantity" name="quantity" type="number" step="0.01" required />
-              </div>
-              <div className="flex items-end">
-                <Button type="submit">Allocate</Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>Inventory used</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-2">
+          <p className="text-xs text-muted-foreground">
+            Deducted automatically from each installed-equipment row&apos;s matched inventory item when installation
+            is signed off.
+          </p>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Item</TableHead>
-                <TableHead>Quantity</TableHead>
+                <TableHead>Quantity used</TableHead>
                 <TableHead>Unit cost</TableHead>
+                <TableHead>Left over</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -1324,12 +1303,15 @@ export default async function ConnectionDetailPage({
                     <TableCell>{t.inventoryItem.name}</TableCell>
                     <TableCell>{t.quantity.toString()}</TableCell>
                     <TableCell>{money(Number(t.unitCost ?? 0))}</TableCell>
+                    <TableCell>
+                      {t.inventoryItem.runningStock.toString()} {t.inventoryItem.unit}
+                    </TableCell>
                   </TableRow>
                 ))}
               {connection.inventoryTxns.filter((t) => t.type === "ALLOCATION").length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground">
-                    No inventory allocated yet.
+                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    No inventory used yet — signs off happen from the Installation status form above.
                   </TableCell>
                 </TableRow>
               )}
