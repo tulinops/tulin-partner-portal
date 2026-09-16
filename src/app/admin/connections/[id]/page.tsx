@@ -19,12 +19,15 @@ import {
   type SiteInspectionDetails,
   type InstalledEquipmentItem,
 } from "@/server/connections";
+import { isInspectionComplete, areRequiredSitePhotosComplete } from "@/lib/siteVisitReadiness";
 import { ensureConnectionDocuments } from "@/server/documents";
 import { listInventoryItems } from "@/server/inventory";
 import { listStaffMembers } from "@/server/staff";
 import { addLeadNote, type EstimateLineItem } from "@/server/leads";
 import { getBusinessProfile } from "@/server/business-profile";
 import { SitePhotos } from "./site-photos";
+import { SiteVisitAssignmentFields } from "./site-visit-assignment-fields";
+import { SiteVisitDetailsFields } from "./site-visit-details-fields";
 import { DocumentRow } from "./document-row";
 import { CustomerTabs } from "./customer-tabs";
 import { InstalledEquipmentEditor } from "./installed-equipment-editor";
@@ -74,27 +77,6 @@ import {
 } from "@/components/ui/table";
 
 const SUBSIDY_STATUSES = ["NOT_APPLIED", "APPLIED", "APPROVED", "REJECTED", "DISBURSED"] as const;
-
-const SITE_VISIT_STATUSES = [
-  "PENDING",
-  "ASSIGNED",
-  "SCHEDULED",
-  "IN_PROGRESS",
-  "COMPLETED",
-  "RESCHEDULE_REQUESTED",
-  "CANCELLED",
-] as const;
-
-const SITE_VISIT_RESULTS = [
-  "SUITABLE",
-  "SUITABLE_WITH_CONDITIONS",
-  "NOT_SUITABLE",
-  "REQUIRES_FURTHER_INSPECTION",
-] as const;
-
-const ROOF_TYPES = ["RCC", "TIN", "TILED", "OTHER"] as const;
-const ROOF_CONDITIONS = ["GOOD", "NEEDS_REPAIR", "POOR"] as const;
-const ROOF_ACCESS_OPTIONS = ["EASY", "LADDER_REQUIRED", "DIFFICULT"] as const;
 
 const LOAN_STATUSES = [
   "APPLICATION_PENDING",
@@ -188,6 +170,8 @@ export default async function ConnectionDetailPage({
   const staff = await listStaffMembers();
   const tenant = await getBusinessProfile();
   const inspection = siteInspectionDetails ?? ({} as SiteInspectionDetails);
+  const canCompleteSiteVisit =
+    isInspectionComplete(siteInspectionDetails) && areRequiredSitePhotosComplete(connection.sitePhotos);
 
   async function recordPaymentAction(formData: FormData) {
     "use server";
@@ -213,7 +197,11 @@ export default async function ConnectionDetailPage({
     });
   }
 
-  async function propertyInspectionAction(formData: FormData) {
+  // One combined save for the merged "Property inspection & site visit
+  // result" card — inspection details are written first so the result save
+  // (which requires inspection + required photos to already be complete)
+  // sees the just-saved values rather than racing against them.
+  async function siteVisitDetailsAction(formData: FormData) {
     "use server";
     const roofAreaSqft = formData.get("roofAreaSqft");
     const details: SiteInspectionDetails = {
@@ -228,10 +216,6 @@ export default async function ConnectionDetailPage({
       otherRequirements: String(formData.get("otherRequirements") || "") || undefined,
     };
     await recordSiteInspectionDetails({ connectionId: id, details });
-  }
-
-  async function siteVisitResultAction(formData: FormData) {
-    "use server";
     await recordSiteVisitResult({
       connectionId: id,
       result: formData.get("result") as SiteVisitResult,
@@ -602,80 +586,15 @@ export default async function ConnectionDetailPage({
         </CardHeader>
         <CardContent>
           <ActionForm action={siteVisitAssignmentAction} successMessage="Site visit assignment saved" className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="staffMemberId">Worker</Label>
-              <Select
-                name="staffMemberId"
-                defaultValue={connection.staffMemberId ?? undefined}
-                disabled={staff.length === 0}
-              >
-                <SelectTrigger id="staffMemberId">
-                  <SelectValue placeholder={staff.length === 0 ? "No workers added yet" : "Select a worker"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {staff.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                      {s.phone ? ` (${s.phone})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {staff.length === 0 && (
-                <p className="text-xs text-muted-foreground">
-                  No workers yet —{" "}
-                  <Link href="/admin/staff" className="underline underline-offset-4">
-                    add one from Staff
-                  </Link>
-                  .
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="siteVisitStatus">Status</Label>
-              {/* Keyed to connection.updatedAt so this remounts and re-syncs
-                  whenever anything else changes siteVisitStatus (e.g.
-                  recording a site visit result auto-completes it) — without
-                  this, re-saving the assignment form afterward would resubmit
-                  this Select's stale original value and silently revert the
-                  status right back, exactly undoing that auto-completion. */}
-              <Select
-                key={connection.updatedAt.getTime()}
-                name="siteVisitStatus"
-                defaultValue={connection.siteVisitStatus}
-              >
-                <SelectTrigger id="siteVisitStatus">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SITE_VISIT_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="siteVisitScheduledAt">Visit date &amp; time</Label>
-              <Input
-                id="siteVisitScheduledAt"
-                name="siteVisitScheduledAt"
-                type="datetime-local"
-                defaultValue={datetimeLocalValue(connection.siteVisitScheduledAt)}
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="siteVisitInstructions">Instructions for worker</Label>
-              <Textarea
-                id="siteVisitInstructions"
-                name="siteVisitInstructions"
-                defaultValue={connection.siteVisitInstructions ?? ""}
-              />
-            </div>
-            <div>
-              <Button type="submit">Save assignment</Button>
-            </div>
+            <SiteVisitAssignmentFields
+              key={connection.updatedAt.getTime()}
+              staff={staff}
+              initialStaffMemberId={connection.staffMemberId}
+              initialStatus={connection.siteVisitStatus}
+              initialScheduledAt={datetimeLocalValue(connection.siteVisitScheduledAt)}
+              initialInstructions={connection.siteVisitInstructions ?? ""}
+              canCompleteSiteVisit={canCompleteSiteVisit}
+            />
           </ActionForm>
         </CardContent>
       </Card>
@@ -691,136 +610,21 @@ export default async function ConnectionDetailPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Property inspection</CardTitle>
+          <CardTitle>Property inspection &amp; site visit result</CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={propertyInspectionAction} successMessage="Property inspection details saved" className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="roofType">Roof type</Label>
-              <Select
-                key={connection.updatedAt.getTime()}
-                name="roofType"
-                defaultValue={inspection.roofType ?? undefined}
-              >
-                <SelectTrigger id="roofType">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROOF_TYPES.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="roofCondition">Roof condition</Label>
-              <Select
-                key={connection.updatedAt.getTime()}
-                name="roofCondition"
-                defaultValue={inspection.roofCondition ?? undefined}
-              >
-                <SelectTrigger id="roofCondition">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROOF_CONDITIONS.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="roofAreaSqft">Available roof area (sq. ft)</Label>
-              <Input
-                id="roofAreaSqft"
-                name="roofAreaSqft"
-                type="number"
-                step="0.01"
-                defaultValue={inspection.roofAreaSqft?.toString() ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="shadowObstruction">Shadow / obstruction</Label>
-              <Input id="shadowObstruction" name="shadowObstruction" defaultValue={inspection.shadowObstruction ?? ""} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="orientation">Direction / orientation</Label>
-              <Input id="orientation" name="orientation" defaultValue={inspection.orientation ?? ""} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="roofAccess">Access to roof</Label>
-              <Select
-                key={connection.updatedAt.getTime()}
-                name="roofAccess"
-                defaultValue={inspection.roofAccess ?? undefined}
-              >
-                <SelectTrigger id="roofAccess">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROOF_ACCESS_OPTIONS.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {r.replace(/_/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="electricalConnectionDetails">Electrical connection details</Label>
-              <Input
-                id="electricalConnectionDetails"
-                name="electricalConnectionDetails"
-                defaultValue={inspection.electricalConnectionDetails ?? ""}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="meterInformation">Meter information</Label>
-              <Input id="meterInformation" name="meterInformation" defaultValue={inspection.meterInformation ?? ""} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="otherRequirements">Other requirements</Label>
-              <Input
-                id="otherRequirements"
-                name="otherRequirements"
-                defaultValue={inspection.otherRequirements ?? ""}
-              />
-            </div>
-            <div className="sm:col-span-3">
-              <Button type="submit">Save inspection details</Button>
-            </div>
-          </ActionForm>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Site visit result</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ActionForm action={siteVisitResultAction} successMessage="Site visit result saved" className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {SITE_VISIT_RESULTS.map((r) => (
-                <Button
-                  key={r}
-                  type="submit"
-                  name="result"
-                  value={r}
-                  variant={r === connection.siteVisitResult ? "default" : "outline"}
-                  size="sm"
-                >
-                  {r.replace(/_/g, " ")}
-                </Button>
-              ))}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workerNotes">Worker notes</Label>
-              <Textarea id="workerNotes" name="workerNotes" defaultValue={connection.siteVisitWorkerNotes ?? ""} />
-            </div>
+          <ActionForm
+            action={siteVisitDetailsAction}
+            successMessage="Site visit details saved"
+            className="space-y-6"
+          >
+            <SiteVisitDetailsFields
+              key={connection.updatedAt.getTime()}
+              initialDetails={inspection}
+              currentResult={connection.siteVisitResult}
+              initialWorkerNotes={connection.siteVisitWorkerNotes ?? ""}
+              canCompleteSiteVisit={canCompleteSiteVisit}
+            />
           </ActionForm>
         </CardContent>
       </Card>

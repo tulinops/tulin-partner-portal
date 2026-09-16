@@ -2,10 +2,15 @@
 
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { put } from "@vercel/blob";
+import { put, del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
 import { computeConnectionStage } from "@/lib/connectionStage";
+import {
+  isInspectionComplete,
+  areRequiredSitePhotosComplete,
+  MAX_PHOTOS_PER_CATEGORY,
+} from "@/lib/siteVisitReadiness";
 import type {
   ConnectionStatus,
   SubsidyStatus,
@@ -153,6 +158,20 @@ export type SiteInspectionDetails = {
   otherRequirements?: string;
 };
 
+async function assertCanCompleteSiteVisit(
+  db: Awaited<ReturnType<typeof getTenantDb>>["db"],
+  connectionId: string,
+  connection: { siteInspectionDetails: unknown },
+) {
+  const details = (connection.siteInspectionDetails ?? null) as SiteInspectionDetails | null;
+  const photos = await db.sitePhoto.findMany({ where: { connectionId }, select: { category: true } });
+  if (!isInspectionComplete(details) || !areRequiredSitePhotosComplete(photos)) {
+    throw new Error(
+      "Complete the property inspection and upload Roof/Meter/Install area photos before marking the site visit complete.",
+    );
+  }
+}
+
 // Same pattern as EstimateLineItem — always read/edited together per
 // connection, never queried individually across connections.
 export type InstalledEquipmentItem = {
@@ -237,6 +256,10 @@ export async function updateSiteVisitStatus(input: { connectionId: string; statu
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
 
+  if (input.status === "COMPLETED") {
+    await assertCanCompleteSiteVisit(db, input.connectionId, connection);
+  }
+
   // Convenience nudge only — the Admin can still override via the overall status card.
   const nextConnectionStatus =
     input.status === "COMPLETED" && connection.status === "SITE_INSPECTION_PENDING"
@@ -277,6 +300,10 @@ export async function recordSiteVisitResult(input: {
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
 
+  // Recording a result always completes the visit (see below), so it needs
+  // the same precondition check updateSiteVisitStatus applies for COMPLETED.
+  await assertCanCompleteSiteVisit(db, input.connectionId, connection);
+
   // Recording a result is how a proprietor says "the visit happened" — it
   // completes the visit itself, same "nudge" pattern updateSiteVisitStatus
   // uses, so the stage tracker actually advances to Documents from here
@@ -314,6 +341,11 @@ export async function uploadSitePhoto(formData: FormData) {
     throw new Error("Image is too large (max 8MB)");
   }
 
+  const existingCount = await db.sitePhoto.count({ where: { connectionId, category } });
+  if (existingCount >= MAX_PHOTOS_PER_CATEGORY) {
+    throw new Error(`Up to ${MAX_PHOTOS_PER_CATEGORY} photos allowed per category — delete one first to add another.`);
+  }
+
   const ext = path.extname(file.name) || ".jpg";
   const fileName = `${randomUUID()}${ext}`;
   const pathname = `uploads/${tenantId}/${connectionId}/${fileName}`;
@@ -330,6 +362,16 @@ export async function uploadSitePhoto(formData: FormData) {
     },
   });
   revalidatePath(`/admin/connections/${connectionId}`);
+}
+
+export async function deleteSitePhoto(input: { id: string; connectionId: string }) {
+  const { db } = await getTenantDb();
+  const photo = await db.sitePhoto.findFirst({ where: { id: input.id, connectionId: input.connectionId } });
+  if (!photo) throw new Error("Photo not found");
+
+  await db.sitePhoto.delete({ where: { id: input.id } });
+  await del(photo.filePath).catch(() => {});
+  revalidatePath(`/admin/connections/${input.connectionId}`);
 }
 
 export async function selectFinancingMethod(input: { connectionId: string; method: FinancingMethod }) {
