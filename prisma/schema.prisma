@@ -540,13 +540,15 @@ model SitePhoto {
 
 model StaffMember {
   // non-login record for v1, see plan's flagged assumption
-  id       String  @id @default(cuid())
-  tenantId String
-  tenant   Tenant  @relation(fields: [tenantId], references: [id])
-  name     String
-  phone    String?
-  isActive Boolean @default(true)
-  userId   String? // NULL in v1; populate in Phase 2 if staff get real logins
+  id          String  @id @default(cuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  name        String
+  phone       String?
+  designation String?
+  address     String?
+  isActive    Boolean @default(true)
+  userId      String? // NULL in v1; populate in Phase 2 if staff get real logins
 
   connections Connection[]
 

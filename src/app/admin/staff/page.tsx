@@ -18,6 +18,8 @@ async function createStaffAction(formData: FormData) {
   await createStaffMember({
     name: String(formData.get("name")),
     phone: String(formData.get("phone") || "") || undefined,
+    designation: String(formData.get("designation") || "") || undefined,
+    address: String(formData.get("address") || "") || undefined,
   });
 }
 
@@ -46,6 +48,14 @@ export default async function StaffPage() {
               <Label htmlFor="phone">Phone (optional)</Label>
               <Input id="phone" name="phone" />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="designation">Designation (optional)</Label>
+              <Input id="designation" name="designation" />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="address">Address (optional)</Label>
+              <Input id="address" name="address" />
+            </div>
             <div className="flex items-end">
               <Button type="submit">Add worker</Button>
             </div>
@@ -63,6 +73,8 @@ export default async function StaffPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Phone</TableHead>
+                <TableHead>Designation</TableHead>
+                <TableHead>Address</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -70,11 +82,13 @@ export default async function StaffPage() {
                 <TableRow key={s.id}>
                   <TableCell>{s.name}</TableCell>
                   <TableCell>{s.phone ?? "—"}</TableCell>
+                  <TableCell>{s.designation ?? "—"}</TableCell>
+                  <TableCell>{s.address ?? "—"}</TableCell>
                 </TableRow>
               ))}
               {staff.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center text-muted-foreground">
+                  <TableCell colSpan={4} className="text-center text-muted-foreground">
                     No workers added yet.
                   </TableCell>
                 </TableRow>
