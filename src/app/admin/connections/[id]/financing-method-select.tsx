@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { selectFinancingMethod } from "@/server/connections";
@@ -20,9 +21,16 @@ export function FinancingMethodSelect({
 
   function handleChange(next: string) {
     const method = next as FinancingMethod;
+    const previous = value;
     setValue(method);
     startTransition(async () => {
-      await selectFinancingMethod({ connectionId, method });
+      try {
+        await selectFinancingMethod({ connectionId, method });
+        toast.success("Financing method saved");
+      } catch (err) {
+        setValue(previous);
+        toast.error(err instanceof Error ? err.message : "Something went wrong");
+      }
     });
   }
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, forwardRef } from "react";
 import type { ComponentPropsWithoutRef } from "react";
 import { FileText } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -214,6 +215,9 @@ export function DocumentRow({ doc }: { doc: DocumentRowDoc }) {
         status,
         remarks: remarks.trim() ? remarks : undefined,
       });
+      toast.success("Document status saved");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setSavePending(false);
     }
@@ -228,6 +232,9 @@ export function DocumentRow({ doc }: { doc: DocumentRowDoc }) {
       formData.set("file", selectedFile);
       await uploadConnectionDocument(formData);
       setSelectedFile(null);
+      toast.success("File uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setUploadPending(false);
     }

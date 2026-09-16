@@ -52,6 +52,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge, CONNECTION_STATUS_TONE } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ActionForm } from "@/components/action-form";
 import {
   Select,
   SelectContent,
@@ -588,7 +589,7 @@ export default async function ConnectionDetailPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={siteVisitAssignmentAction} className="grid gap-4 sm:grid-cols-2">
+          <ActionForm action={siteVisitAssignmentAction} successMessage="Site visit assignment saved" className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="staffMemberId">Worker</Label>
               <Select
@@ -663,7 +664,7 @@ export default async function ConnectionDetailPage({
             <div>
               <Button type="submit">Save assignment</Button>
             </div>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -681,7 +682,7 @@ export default async function ConnectionDetailPage({
           <CardTitle>Property inspection</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={propertyInspectionAction} className="grid gap-4 sm:grid-cols-3">
+          <ActionForm action={propertyInspectionAction} successMessage="Property inspection details saved" className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="roofType">Roof type</Label>
               <Select
@@ -780,7 +781,7 @@ export default async function ConnectionDetailPage({
             <div className="sm:col-span-3">
               <Button type="submit">Save inspection details</Button>
             </div>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -789,7 +790,7 @@ export default async function ConnectionDetailPage({
           <CardTitle>Site visit result</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={siteVisitResultAction} className="space-y-4">
+          <ActionForm action={siteVisitResultAction} successMessage="Site visit result saved" className="space-y-4">
             <div className="flex flex-wrap gap-2">
               {SITE_VISIT_RESULTS.map((r) => (
                 <Button
@@ -808,7 +809,7 @@ export default async function ConnectionDetailPage({
               <Label htmlFor="workerNotes">Worker notes</Label>
               <Textarea id="workerNotes" name="workerNotes" defaultValue={connection.siteVisitWorkerNotes ?? ""} />
             </div>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
     </div>
@@ -881,7 +882,7 @@ export default async function ConnectionDetailPage({
           <CardTitle>Record customer payment</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={recordPaymentAction} className="grid gap-4 sm:grid-cols-3">
+          <ActionForm action={recordPaymentAction} successMessage="Payment recorded" className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="amount">Amount (₹)</Label>
               <Input id="amount" name="amount" type="number" step="0.01" required />
@@ -893,7 +894,7 @@ export default async function ConnectionDetailPage({
             <div className="flex items-end">
               <Button type="submit">Record payment</Button>
             </div>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -916,7 +917,7 @@ export default async function ConnectionDetailPage({
               Tracking-only — this is credited by the government directly to the customer&apos;s own bank account, never
               to us. Never sum this into revenue.
             </p>
-            <form action={subsidyAction} className="grid gap-4 sm:grid-cols-3">
+            <ActionForm action={subsidyAction} successMessage="Subsidy application saved" className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="subsidyScheme">Scheme</Label>
                 <Input id="subsidyScheme" name="subsidyScheme" defaultValue={connection.subsidyScheme ?? ""} />
@@ -998,7 +999,7 @@ export default async function ConnectionDetailPage({
               <div className="flex items-end">
                 <Button type="submit">Save subsidy application</Button>
               </div>
-            </form>
+            </ActionForm>
           </CardContent>
         </Card>
       )}
@@ -1026,7 +1027,7 @@ export default async function ConnectionDetailPage({
                     </p>
                   )}
                 </div>
-                <form action={loanUpdateAction} className="grid gap-4 sm:grid-cols-3">
+                <ActionForm action={loanUpdateAction} successMessage="Loan application updated" className="grid gap-4 sm:grid-cols-3">
                   <input type="hidden" name="loanId" value={currentLoanApplication.id} />
                   <div className="space-y-2">
                     <Label htmlFor="loanStatus">Status</Label>
@@ -1123,10 +1124,10 @@ export default async function ConnectionDetailPage({
                   <div>
                     <Button type="submit">Save</Button>
                   </div>
-                </form>
+                </ActionForm>
               </>
             ) : (
-              <form action={loanApplicationAction} className="grid gap-4 sm:grid-cols-3">
+              <ActionForm action={loanApplicationAction} successMessage="Loan application created" className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="bankName">Bank / NBFC</Label>
                   <Input id="bankName" name="bankName" required />
@@ -1146,7 +1147,7 @@ export default async function ConnectionDetailPage({
                 <div className="flex items-end">
                   <Button type="submit">Create loan application</Button>
                 </div>
-              </form>
+              </ActionForm>
             )}
           </CardContent>
         </Card>
@@ -1173,7 +1174,7 @@ export default async function ConnectionDetailPage({
           <CardTitle>Installation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <form action={installationStatusAction} className="flex flex-wrap items-end gap-4">
+          <ActionForm action={installationStatusAction} successMessage="Installation status saved" className="flex flex-wrap items-end gap-4">
             <div className="space-y-2">
               <Label htmlFor="installationStatus">Status</Label>
               {/* Keyed so this re-syncs after recordInstallationSignOff sets
@@ -1198,11 +1199,11 @@ export default async function ConnectionDetailPage({
               </Select>
             </div>
             <Button type="submit">Save status</Button>
-          </form>
+          </ActionForm>
 
           <div>
             <p className="mb-2 text-sm font-medium">Installed equipment</p>
-            <form action={installedEquipmentAction} className="space-y-2">
+            <ActionForm action={installedEquipmentAction} successMessage="Installed equipment saved" className="space-y-2">
               {/* Forces a remount after every save so edits (brand, serial
                   numbers, etc.) don't look like they vanished — same
                   stale-client-state issue fixed for the Estimate/Invoice editors. */}
@@ -1215,10 +1216,10 @@ export default async function ConnectionDetailPage({
               <Button type="submit" size="sm">
                 Save
               </Button>
-            </form>
+            </ActionForm>
           </div>
 
-          <form action={signOffAction} className="grid gap-4 border-t pt-4 sm:grid-cols-3">
+          <ActionForm action={signOffAction} successMessage="Installation signed off" className="grid gap-4 border-t pt-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="signedOffByName">Signed off by</Label>
               <Input
@@ -1241,7 +1242,7 @@ export default async function ConnectionDetailPage({
                 auto-creates warranty records from the equipment list, using sensible default periods you can edit.
               </p>
             )}
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 
@@ -1311,9 +1312,9 @@ export default async function ConnectionDetailPage({
               invoice — not the original quotation — so it reflects anything added on-site. It&apos;s fully
               editable afterward.
             </p>
-            <form action={generateInvoiceAction}>
+            <ActionForm action={generateInvoiceAction} successMessage="Invoice generated">
               <Button type="submit">Generate invoice</Button>
-            </form>
+            </ActionForm>
           </div>
         ) : (
           <div className="space-y-4">
@@ -1325,7 +1326,7 @@ export default async function ConnectionDetailPage({
                 </Button>
               </Link>
             </div>
-            <form action={updateInvoiceAction} className="space-y-4">
+            <ActionForm action={updateInvoiceAction} successMessage="Invoice updated" className="space-y-4">
               <div className="space-y-2 sm:w-64">
                 <Label htmlFor="invoiceDate">Invoice date</Label>
                 <Input
@@ -1348,7 +1349,7 @@ export default async function ConnectionDetailPage({
                 <Textarea id="notes" name="notes" defaultValue={connection.invoice.notes ?? ""} rows={6} />
               </div>
               <Button type="submit">Save changes</Button>
-            </form>
+            </ActionForm>
           </div>
         )}
       </CardContent>
@@ -1413,10 +1414,10 @@ export default async function ConnectionDetailPage({
         </Table>
 
         <AddWarrantyDialog key={warrantyRecordsWithExpiry.length}>
-          <form action={warrantyCreateAction} className="space-y-4">
+          <ActionForm action={warrantyCreateAction} successMessage="Warranty record added" className="space-y-4">
             <WarrantyRecordForm installedEquipment={installedEquipment} />
             <Button type="submit">Add warranty record</Button>
-          </form>
+          </ActionForm>
         </AddWarrantyDialog>
       </CardContent>
     </Card>
@@ -1428,7 +1429,7 @@ export default async function ConnectionDetailPage({
         <CardTitle>Activity &amp; notes</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form action={addNoteAction} className="space-y-2">
+        <ActionForm action={addNoteAction} successMessage="Note added" className="space-y-2">
           <Textarea name="body" placeholder="Add a note..." required />
           <div className="flex items-center gap-2">
             <Label htmlFor="followUpAt" className="text-sm text-muted-foreground">
@@ -1439,7 +1440,7 @@ export default async function ConnectionDetailPage({
               Add note
             </Button>
           </div>
-        </form>
+        </ActionForm>
         <div className="space-y-3 border-t pt-4">
           {connection.lead.notes.map((note) => (
             <div key={note.id} className="text-sm">

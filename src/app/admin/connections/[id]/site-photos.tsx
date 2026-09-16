@@ -1,5 +1,6 @@
 import { uploadSitePhoto } from "@/server/connections";
 import { Button } from "@/components/ui/button";
+import { ActionForm } from "@/components/action-form";
 
 const CATEGORIES = [
   { value: "ROOF", label: "Roof photos" },
@@ -39,14 +40,14 @@ export function SitePhotos({ connectionId, photos }: { connectionId: string; pho
                 ))}
               </div>
             )}
-            <form action={uploadAction} className="flex items-center gap-2">
+            <ActionForm action={uploadAction} successMessage="Photo uploaded" className="flex items-center gap-2">
               <input type="hidden" name="connectionId" value={connectionId} />
               <input type="hidden" name="category" value={cat.value} />
               <input type="file" name="file" accept="image/*" required className="text-xs" />
               <Button type="submit" size="sm" variant="outline">
                 Upload
               </Button>
-            </form>
+            </ActionForm>
           </div>
         );
       })}
