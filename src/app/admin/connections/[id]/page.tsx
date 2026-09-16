@@ -7,7 +7,6 @@ import {
   updateSiteVisitStatus,
   recordSiteInspectionDetails,
   recordSiteVisitResult,
-  selectFinancingMethod,
   updateSubsidyApplication,
   createLoanApplication,
   updateLoanApplication,
@@ -27,6 +26,7 @@ import { SitePhotos } from "./site-photos";
 import { DocumentRow } from "./document-row";
 import { CustomerTabs } from "./customer-tabs";
 import { InstalledEquipmentEditor } from "./installed-equipment-editor";
+import { FinancingMethodSelect } from "./financing-method-select";
 import { WarrantyRecordForm } from "./warranty-record-form";
 import { AddWarrantyDialog } from "./add-warranty-dialog";
 import { WarrantyRecordView } from "./warranty-record-view";
@@ -39,7 +39,6 @@ import { brandLabel } from "@/lib/estimateBrands";
 import type {
   SiteVisitStatus,
   SiteVisitResult,
-  FinancingMethod,
   LoanStatus,
   InstallationStatus,
   EquipmentType,
@@ -254,14 +253,6 @@ export default async function ConnectionDetailPage({
       subsidyAppliedAt: appliedAt ? new Date(String(appliedAt)) : undefined,
       subsidyApprovedAt: approvedAt ? new Date(String(approvedAt)) : undefined,
       subsidyDisbursedAt: disbursedAt ? new Date(String(disbursedAt)) : undefined,
-    });
-  }
-
-  async function financingMethodAction(formData: FormData) {
-    "use server";
-    await selectFinancingMethod({
-      connectionId: id,
-      method: formData.get("financingMethod") as FinancingMethod,
     });
   }
 
@@ -911,30 +902,7 @@ export default async function ConnectionDetailPage({
           <CardTitle>How is the customer paying?</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={financingMethodAction} className="flex flex-wrap items-end gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="financingMethod">Financing method</Label>
-              {/* Keyed for the same reason as the other status dropdowns on
-                  this page — forces a remount/re-sync with the true saved
-                  value on every render instead of trusting an uncontrolled
-                  Select to keep itself in sync after a save. */}
-              <Select
-                key={connection.updatedAt.getTime()}
-                name="financingMethod"
-                defaultValue={connection.financingMethod}
-              >
-                <SelectTrigger id="financingMethod" className="w-64">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NOT_SELECTED">Not selected</SelectItem>
-                  <SelectItem value="FULL_PAYMENT">Full payment (subsidy to customer)</SelectItem>
-                  <SelectItem value="LOAN">Bank loan</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit">Save</Button>
-          </form>
+          <FinancingMethodSelect connectionId={id} initialValue={connection.financingMethod} />
         </CardContent>
       </Card>
 
