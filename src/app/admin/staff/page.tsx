@@ -1,17 +1,12 @@
-import { listStaffMembers, createStaffMember } from "@/server/staff";
+import { listAllStaffMembers, createStaffMember } from "@/server/staff";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { StatusBadge } from "@/components/status-badge";
+import { EditStaffDialog } from "./edit-staff-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 async function createStaffAction(formData: FormData) {
   "use server";
@@ -24,7 +19,7 @@ async function createStaffAction(formData: FormData) {
 }
 
 export default async function StaffPage() {
-  const staff = await listStaffMembers();
+  const staff = await listAllStaffMembers();
 
   return (
     <div className="space-y-6">
@@ -75,20 +70,28 @@ export default async function StaffPage() {
                 <TableHead>Phone</TableHead>
                 <TableHead>Designation</TableHead>
                 <TableHead>Address</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {staff.map((s) => (
                 <TableRow key={s.id}>
-                  <TableCell>{s.name}</TableCell>
+                  <TableCell className="font-medium">{s.name}</TableCell>
                   <TableCell>{s.phone ?? "—"}</TableCell>
                   <TableCell>{s.designation ?? "—"}</TableCell>
                   <TableCell>{s.address ?? "—"}</TableCell>
+                  <TableCell>
+                    <StatusBadge tone={s.isActive ? "done" : "neutral"} label={s.isActive ? "Active" : "Inactive"} />
+                  </TableCell>
+                  <TableCell>
+                    <EditStaffDialog staff={s} />
+                  </TableCell>
                 </TableRow>
               ))}
               {staff.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     No workers added yet.
                   </TableCell>
                 </TableRow>

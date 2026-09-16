@@ -547,8 +547,10 @@ model StaffMember {
   phone       String?
   designation String?
   address     String?
-  isActive    Boolean @default(true)
+  isActive    Boolean  @default(true)
   userId      String? // NULL in v1; populate in Phase 2 if staff get real logins
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   connections Connection[]
 
