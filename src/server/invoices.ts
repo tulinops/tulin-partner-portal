@@ -2,7 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
-import { guessEquipmentType, defaultWarrantyProductName } from "@/lib/installationEquipment";
+import {
+  guessEquipmentType,
+  defaultWarrantyProductName,
+  buildEquipmentFromEstimateLineItems,
+} from "@/lib/installationEquipment";
+import { brandLabel } from "@/lib/estimateBrands";
 import { DEFAULT_ESTIMATE_TERMS, DEFAULT_ITEM_GST_PERCENT } from "@/lib/estimateDefaults";
 import type { EstimateLineItem } from "@/server/leads";
 import type { InstalledEquipmentItem } from "@/server/connections";
@@ -86,7 +91,17 @@ export async function generateInvoice(connectionId: string) {
 
   const finalEstimate = connection.lead.estimates[0];
   const quoteLineItems = (finalEstimate?.lineItems as unknown as EstimateLineItem[] | null) ?? [];
-  const equipment = (connection.installedEquipment ?? []) as InstalledEquipmentItem[];
+  // The Installed Equipment form on the Installation tab shows the estimate's
+  // items as an unsaved prefill until an admin explicitly clicks Save there
+  // — so installedEquipment can still be null/empty for a connection whose
+  // estimate is fully specified. Fall back to deriving equipment from the
+  // estimate the same way that prefill does, so the invoice isn't seeded
+  // empty just because nobody happened to save that form first.
+  const savedEquipment = (connection.installedEquipment ?? []) as InstalledEquipmentItem[];
+  const equipment =
+    savedEquipment.length > 0
+      ? savedEquipment
+      : buildEquipmentFromEstimateLineItems(quoteLineItems, brandLabel(finalEstimate?.brand));
   const items = buildInvoiceLineItems(equipment, quoteLineItems);
   const { subtotal, gstAmount, totalAmount, gstPercent } = computeInvoiceTotals(items);
 
