@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
+import { asActionResult } from "@/lib/actionResult";
 
 // Active-only — used for operational pickers (e.g. site-visit assignment)
 // where an inactive worker shouldn't be selectable.
@@ -49,19 +50,21 @@ export async function updateStaffMember(input: {
   address?: string;
   isActive: boolean;
 }) {
-  const { db } = await getTenantDb();
-  const staff = await db.staffMember.findFirst({ where: { id: input.id } });
-  if (!staff) throw new Error("Worker not found");
+  return asActionResult(async () => {
+    const { db } = await getTenantDb();
+    const staff = await db.staffMember.findFirst({ where: { id: input.id } });
+    if (!staff) throw new Error("Worker not found");
 
-  await db.staffMember.update({
-    where: { id: input.id },
-    data: {
-      name: input.name,
-      phone: input.phone,
-      designation: input.designation,
-      address: input.address,
-      isActive: input.isActive,
-    },
+    await db.staffMember.update({
+      where: { id: input.id },
+      data: {
+        name: input.name,
+        phone: input.phone,
+        designation: input.designation,
+        address: input.address,
+        isActive: input.isActive,
+      },
+    });
+    revalidatePath("/admin/staff");
   });
-  revalidatePath("/admin/staff");
 }

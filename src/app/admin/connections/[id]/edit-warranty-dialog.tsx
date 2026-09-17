@@ -66,7 +66,7 @@ export function EditWarrantyDialog({ record }: { record: EditableWarrantyRecord 
     event.preventDefault();
     setPending(true);
     try {
-      await updateWarrantyRecord({
+      const result = await updateWarrantyRecord({
         id: record.id,
         connectionId: record.connectionId,
         equipmentType,
@@ -79,8 +79,12 @@ export function EditWarrantyDialog({ record }: { record: EditableWarrantyRecord 
         periodMonths: Number(periodMonths) || 0,
         terms: terms.trim() || undefined,
       });
-      toast.success("Warranty record updated");
-      setOpen(false);
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Warranty record updated");
+        setOpen(false);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {

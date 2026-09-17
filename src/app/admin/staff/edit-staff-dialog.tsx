@@ -41,7 +41,7 @@ export function EditStaffDialog({ staff }: { staff: EditableStaff }) {
     event.preventDefault();
     setPending(true);
     try {
-      await updateStaffMember({
+      const result = await updateStaffMember({
         id: staff.id,
         name,
         phone: phone.trim() || undefined,
@@ -49,8 +49,12 @@ export function EditStaffDialog({ staff }: { staff: EditableStaff }) {
         address: address.trim() || undefined,
         isActive,
       });
-      toast.success("Worker updated");
-      setOpen(false);
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Worker updated");
+        setOpen(false);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {

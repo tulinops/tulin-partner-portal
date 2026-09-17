@@ -16,8 +16,13 @@ export function DocumentTypeStatusToggle({ id, initialActive }: { id: string; in
     setIsActive(next);
     startTransition(async () => {
       try {
-        await updateRequiredDocumentType({ id, isActive: next });
-        toast.success(next ? "Document type reactivated" : "Document type retired");
+        const result = await updateRequiredDocumentType({ id, isActive: next });
+        if (result?.error) {
+          setIsActive(previous);
+          toast.error(result.error);
+        } else {
+          toast.success(next ? "Document type reactivated" : "Document type retired");
+        }
       } catch (err) {
         setIsActive(previous);
         toast.error(err instanceof Error ? err.message : "Something went wrong");

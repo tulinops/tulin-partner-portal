@@ -35,15 +35,19 @@ export function EditItemDialog({ item }: { item: EditableInventoryItem }) {
     event.preventDefault();
     setPending(true);
     try {
-      await updateInventoryItem({
+      const result = await updateInventoryItem({
         id: item.id,
         name,
         brand: brand.trim() || undefined,
         unit,
         supplier: supplier.trim() || undefined,
       });
-      toast.success("Inventory item updated");
-      setOpen(false);
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Inventory item updated");
+        setOpen(false);
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {

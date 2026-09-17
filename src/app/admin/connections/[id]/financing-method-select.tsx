@@ -25,8 +25,13 @@ export function FinancingMethodSelect({
     setValue(method);
     startTransition(async () => {
       try {
-        await selectFinancingMethod({ connectionId, method });
-        toast.success("Financing method saved");
+        const result = await selectFinancingMethod({ connectionId, method });
+        if (result?.error) {
+          setValue(previous);
+          toast.error(result.error);
+        } else {
+          toast.success("Financing method saved");
+        }
       } catch (err) {
         setValue(previous);
         toast.error(err instanceof Error ? err.message : "Something went wrong");

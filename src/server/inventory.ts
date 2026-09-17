@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
+import { asActionResult } from "@/lib/actionResult";
 
 export async function listInventoryItems() {
   const { db } = await getTenantDb();
@@ -41,15 +42,17 @@ export async function updateInventoryItem(input: {
   unit: string;
   supplier?: string;
 }) {
-  const { db } = await getTenantDb();
-  const item = await db.inventoryItem.findFirst({ where: { id: input.id } });
-  if (!item) throw new Error("Inventory item not found");
+  return asActionResult(async () => {
+    const { db } = await getTenantDb();
+    const item = await db.inventoryItem.findFirst({ where: { id: input.id } });
+    if (!item) throw new Error("Inventory item not found");
 
-  await db.inventoryItem.update({
-    where: { id: input.id },
-    data: { name: input.name, brand: input.brand, unit: input.unit || "pcs", supplier: input.supplier },
+    await db.inventoryItem.update({
+      where: { id: input.id },
+      data: { name: input.name, brand: input.brand, unit: input.unit || "pcs", supplier: input.supplier },
+    });
+    revalidatePath("/admin/inventory");
   });
-  revalidatePath("/admin/inventory");
 }
 
 export async function deleteInventoryItem(id: string) {

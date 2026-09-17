@@ -31,8 +31,12 @@ export function SitePhotoUpload({
       formData.set("connectionId", connectionId);
       formData.set("category", category);
       formData.set("file", file);
-      await uploadSitePhoto(formData);
-      toast.success("Photo uploaded");
+      const result = await uploadSitePhoto(formData);
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Photo uploaded");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {

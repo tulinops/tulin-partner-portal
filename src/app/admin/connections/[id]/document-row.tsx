@@ -210,12 +210,16 @@ export function DocumentRow({ doc }: { doc: DocumentRowDoc }) {
   async function handleSave() {
     setSavePending(true);
     try {
-      await updateDocumentStatus({
+      const result = await updateDocumentStatus({
         connectionDocumentId: doc.id,
         status,
         remarks: remarks.trim() ? remarks : undefined,
       });
-      toast.success("Document status saved");
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Document status saved");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -230,9 +234,13 @@ export function DocumentRow({ doc }: { doc: DocumentRowDoc }) {
       const formData = new FormData();
       formData.set("connectionDocumentId", doc.id);
       formData.set("file", selectedFile);
-      await uploadConnectionDocument(formData);
-      setSelectedFile(null);
-      toast.success("File uploaded");
+      const result = await uploadConnectionDocument(formData);
+      if (result?.error) {
+        toast.error(result.error);
+      } else {
+        setSelectedFile(null);
+        toast.success("File uploaded");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {

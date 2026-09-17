@@ -25,8 +25,13 @@ export function SitePhotoThumbnail({
     }
     setPending(true);
     try {
-      await deleteSitePhoto({ id, connectionId });
-      toast.success("Photo deleted");
+      const result = await deleteSitePhoto({ id, connectionId });
+      if (result?.error) {
+        toast.error(result.error);
+        setPending(false);
+      } else {
+        toast.success("Photo deleted");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
       setPending(false);

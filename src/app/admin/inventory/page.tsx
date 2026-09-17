@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ActionForm } from "@/components/action-form";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { asActionResult } from "@/lib/actionResult";
 import { EditItemDialog } from "./edit-item-dialog";
 import { RecordPurchaseForm } from "./record-purchase-form";
 import {
@@ -20,28 +21,32 @@ import {
 
 async function createItemAction(formData: FormData) {
   "use server";
-  await createInventoryItem({
-    name: String(formData.get("name")),
-    brand: String(formData.get("brand") || "") || undefined,
-    unit: String(formData.get("unit") || "pcs"),
-    supplier: String(formData.get("supplier") || "") || undefined,
-  });
+  return asActionResult(() =>
+    createInventoryItem({
+      name: String(formData.get("name")),
+      brand: String(formData.get("brand") || "") || undefined,
+      unit: String(formData.get("unit") || "pcs"),
+      supplier: String(formData.get("supplier") || "") || undefined,
+    }),
+  );
 }
 
 async function recordPurchaseAction(formData: FormData) {
   "use server";
-  await recordPurchase({
-    inventoryItemId: String(formData.get("inventoryItemId")),
-    quantity: Number(formData.get("quantity")),
-    unitCost: Number(formData.get("unitCost")),
-    supplier: String(formData.get("purchaseSupplier") || "") || undefined,
-    brand: String(formData.get("purchaseBrand") || "") || undefined,
-  });
+  return asActionResult(() =>
+    recordPurchase({
+      inventoryItemId: String(formData.get("inventoryItemId")),
+      quantity: Number(formData.get("quantity")),
+      unitCost: Number(formData.get("unitCost")),
+      supplier: String(formData.get("purchaseSupplier") || "") || undefined,
+      brand: String(formData.get("purchaseBrand") || "") || undefined,
+    }),
+  );
 }
 
 async function deleteItemAction(formData: FormData) {
   "use server";
-  await deleteInventoryItem(String(formData.get("id")));
+  return asActionResult(() => deleteInventoryItem(String(formData.get("id"))));
 }
 
 function money(n: number) {

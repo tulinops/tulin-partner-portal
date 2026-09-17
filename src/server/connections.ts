@@ -6,6 +6,7 @@ import { put, del } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { getTenantDb } from "@/lib/tenantDb";
 import { computeConnectionStage } from "@/lib/connectionStage";
+import { asActionResult } from "@/lib/actionResult";
 import {
   isInspectionComplete,
   areRequiredSitePhotosComplete,
@@ -323,67 +324,73 @@ export async function recordSiteVisitResult(input: {
 const MAX_PHOTO_BYTES = 8 * 1024 * 1024;
 
 export async function uploadSitePhoto(formData: FormData) {
-  const { db, tenantId } = await getTenantDb();
-  const connectionId = String(formData.get("connectionId") || "");
-  const category = String(formData.get("category") || "") as SitePhotoCategory;
-  const file = formData.get("file");
+  return asActionResult(async () => {
+    const { db, tenantId } = await getTenantDb();
+    const connectionId = String(formData.get("connectionId") || "");
+    const category = String(formData.get("category") || "") as SitePhotoCategory;
+    const file = formData.get("file");
 
-  const connection = await db.connection.findFirst({ where: { id: connectionId } });
-  if (!connection) throw new Error("Connection not found");
+    const connection = await db.connection.findFirst({ where: { id: connectionId } });
+    if (!connection) throw new Error("Connection not found");
 
-  if (!(file instanceof File) || file.size === 0) {
-    throw new Error("No file provided");
-  }
-  if (!file.type.startsWith("image/")) {
-    throw new Error("Only image files are allowed");
-  }
-  if (file.size > MAX_PHOTO_BYTES) {
-    throw new Error("Image is too large (max 8MB)");
-  }
+    if (!(file instanceof File) || file.size === 0) {
+      throw new Error("No file provided");
+    }
+    if (!file.type.startsWith("image/")) {
+      throw new Error("Only image files are allowed");
+    }
+    if (file.size > MAX_PHOTO_BYTES) {
+      throw new Error("Image is too large (max 8MB)");
+    }
 
-  const existingCount = await db.sitePhoto.count({ where: { connectionId, category } });
-  if (existingCount >= MAX_PHOTOS_PER_CATEGORY) {
-    throw new Error(`Up to ${MAX_PHOTOS_PER_CATEGORY} photos allowed per category — delete one first to add another.`);
-  }
+    const existingCount = await db.sitePhoto.count({ where: { connectionId, category } });
+    if (existingCount >= MAX_PHOTOS_PER_CATEGORY) {
+      throw new Error(`Up to ${MAX_PHOTOS_PER_CATEGORY} photos allowed per category — delete one first to add another.`);
+    }
 
-  const ext = path.extname(file.name) || ".jpg";
-  const fileName = `${randomUUID()}${ext}`;
-  const pathname = `uploads/${tenantId}/${connectionId}/${fileName}`;
-  const bytes = Buffer.from(await file.arrayBuffer());
-  const blob = await put(pathname, bytes, { access: "public", contentType: file.type });
+    const ext = path.extname(file.name) || ".jpg";
+    const fileName = `${randomUUID()}${ext}`;
+    const pathname = `uploads/${tenantId}/${connectionId}/${fileName}`;
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const blob = await put(pathname, bytes, { access: "public", contentType: file.type });
 
-  await db.sitePhoto.create({
-    data: {
-      tenantId,
-      connectionId,
-      category,
-      filePath: blob.url,
-      originalName: file.name,
-    },
+    await db.sitePhoto.create({
+      data: {
+        tenantId,
+        connectionId,
+        category,
+        filePath: blob.url,
+        originalName: file.name,
+      },
+    });
+    revalidatePath(`/admin/connections/${connectionId}`);
   });
-  revalidatePath(`/admin/connections/${connectionId}`);
 }
 
 export async function deleteSitePhoto(input: { id: string; connectionId: string }) {
-  const { db } = await getTenantDb();
-  const photo = await db.sitePhoto.findFirst({ where: { id: input.id, connectionId: input.connectionId } });
-  if (!photo) throw new Error("Photo not found");
+  return asActionResult(async () => {
+    const { db } = await getTenantDb();
+    const photo = await db.sitePhoto.findFirst({ where: { id: input.id, connectionId: input.connectionId } });
+    if (!photo) throw new Error("Photo not found");
 
-  await db.sitePhoto.delete({ where: { id: input.id } });
-  await del(photo.filePath).catch(() => {});
-  revalidatePath(`/admin/connections/${input.connectionId}`);
+    await db.sitePhoto.delete({ where: { id: input.id } });
+    await del(photo.filePath).catch(() => {});
+    revalidatePath(`/admin/connections/${input.connectionId}`);
+  });
 }
 
 export async function selectFinancingMethod(input: { connectionId: string; method: FinancingMethod }) {
-  const { db } = await getTenantDb();
-  const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
-  if (!connection) throw new Error("Connection not found");
+  return asActionResult(async () => {
+    const { db } = await getTenantDb();
+    const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
+    if (!connection) throw new Error("Connection not found");
 
-  await db.connection.update({
-    where: { id: input.connectionId },
-    data: { financingMethod: input.method },
+    await db.connection.update({
+      where: { id: input.connectionId },
+      data: { financingMethod: input.method },
+    });
+    revalidatePath(`/admin/connections/${input.connectionId}`);
   });
-  revalidatePath(`/admin/connections/${input.connectionId}`);
 }
 
 export async function updateSubsidyApplication(input: {
@@ -693,27 +700,29 @@ export async function updateWarrantyRecord(input: {
   periodMonths: number;
   terms?: string;
 }) {
-  const { db } = await getTenantDb();
-  const record = await db.warrantyRecord.findFirst({
-    where: { id: input.id, connectionId: input.connectionId },
-  });
-  if (!record) throw new Error("Warranty record not found");
+  return asActionResult(async () => {
+    const { db } = await getTenantDb();
+    const record = await db.warrantyRecord.findFirst({
+      where: { id: input.id, connectionId: input.connectionId },
+    });
+    if (!record) throw new Error("Warranty record not found");
 
-  await db.warrantyRecord.update({
-    where: { id: input.id },
-    data: {
-      equipmentType: input.equipmentType,
-      productName: input.productName,
-      manufacturer: input.manufacturer,
-      model: input.model,
-      serialNumber: input.serialNumber,
-      warrantyType: input.warrantyType,
-      startDate: input.startDate,
-      periodMonths: input.periodMonths,
-      terms: input.terms,
-    },
+    await db.warrantyRecord.update({
+      where: { id: input.id },
+      data: {
+        equipmentType: input.equipmentType,
+        productName: input.productName,
+        manufacturer: input.manufacturer,
+        model: input.model,
+        serialNumber: input.serialNumber,
+        warrantyType: input.warrantyType,
+        startDate: input.startDate,
+        periodMonths: input.periodMonths,
+        terms: input.terms,
+      },
+    });
+    revalidatePath(`/admin/connections/${input.connectionId}`);
   });
-  revalidatePath(`/admin/connections/${input.connectionId}`);
 }
 
 export async function deleteWarrantyRecord(input: { id: string; connectionId: string }) {

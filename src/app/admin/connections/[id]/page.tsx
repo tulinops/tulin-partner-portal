@@ -60,6 +60,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ActionForm } from "@/components/action-form";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { asActionResult } from "@/lib/actionResult";
 import {
   Select,
   SelectContent,
@@ -175,25 +176,29 @@ export default async function ConnectionDetailPage({
 
   async function recordPaymentAction(formData: FormData) {
     "use server";
-    await recordPayment({
-      connectionId: id,
-      amount: Number(formData.get("amount")),
-      note: String(formData.get("note") || "") || undefined,
-    });
+    return asActionResult(() =>
+      recordPayment({
+        connectionId: id,
+        amount: Number(formData.get("amount")),
+        note: String(formData.get("note") || "") || undefined,
+      }),
+    );
   }
 
   async function siteVisitAssignmentAction(formData: FormData) {
     "use server";
-    const scheduledAt = formData.get("siteVisitScheduledAt");
-    await assignSiteVisit({
-      connectionId: id,
-      staffMemberId: String(formData.get("staffMemberId") || "") || undefined,
-      scheduledAt: scheduledAt ? new Date(String(scheduledAt)) : undefined,
-      instructions: String(formData.get("siteVisitInstructions") || "") || undefined,
-    });
-    await updateSiteVisitStatus({
-      connectionId: id,
-      status: formData.get("siteVisitStatus") as SiteVisitStatus,
+    return asActionResult(async () => {
+      const scheduledAt = formData.get("siteVisitScheduledAt");
+      await assignSiteVisit({
+        connectionId: id,
+        staffMemberId: String(formData.get("staffMemberId") || "") || undefined,
+        scheduledAt: scheduledAt ? new Date(String(scheduledAt)) : undefined,
+        instructions: String(formData.get("siteVisitInstructions") || "") || undefined,
+      });
+      await updateSiteVisitStatus({
+        connectionId: id,
+        status: formData.get("siteVisitStatus") as SiteVisitStatus,
+      });
     });
   }
 
@@ -203,164 +208,186 @@ export default async function ConnectionDetailPage({
   // sees the just-saved values rather than racing against them.
   async function siteVisitDetailsAction(formData: FormData) {
     "use server";
-    const roofAreaSqft = formData.get("roofAreaSqft");
-    const details: SiteInspectionDetails = {
-      roofType: String(formData.get("roofType") || "") || undefined,
-      roofCondition: String(formData.get("roofCondition") || "") || undefined,
-      roofAreaSqft: roofAreaSqft ? Number(roofAreaSqft) : undefined,
-      shadowObstruction: String(formData.get("shadowObstruction") || "") || undefined,
-      orientation: String(formData.get("orientation") || "") || undefined,
-      roofAccess: String(formData.get("roofAccess") || "") || undefined,
-      electricalConnectionDetails: String(formData.get("electricalConnectionDetails") || "") || undefined,
-      meterInformation: String(formData.get("meterInformation") || "") || undefined,
-      otherRequirements: String(formData.get("otherRequirements") || "") || undefined,
-    };
-    await recordSiteInspectionDetails({ connectionId: id, details });
-    await recordSiteVisitResult({
-      connectionId: id,
-      result: formData.get("result") as SiteVisitResult,
-      workerNotes: String(formData.get("workerNotes") || "") || undefined,
+    return asActionResult(async () => {
+      const roofAreaSqft = formData.get("roofAreaSqft");
+      const details: SiteInspectionDetails = {
+        roofType: String(formData.get("roofType") || "") || undefined,
+        roofCondition: String(formData.get("roofCondition") || "") || undefined,
+        roofAreaSqft: roofAreaSqft ? Number(roofAreaSqft) : undefined,
+        shadowObstruction: String(formData.get("shadowObstruction") || "") || undefined,
+        orientation: String(formData.get("orientation") || "") || undefined,
+        roofAccess: String(formData.get("roofAccess") || "") || undefined,
+        electricalConnectionDetails: String(formData.get("electricalConnectionDetails") || "") || undefined,
+        meterInformation: String(formData.get("meterInformation") || "") || undefined,
+        otherRequirements: String(formData.get("otherRequirements") || "") || undefined,
+      };
+      await recordSiteInspectionDetails({ connectionId: id, details });
+      await recordSiteVisitResult({
+        connectionId: id,
+        result: formData.get("result") as SiteVisitResult,
+        workerNotes: String(formData.get("workerNotes") || "") || undefined,
+      });
     });
   }
 
   async function subsidyAction(formData: FormData) {
     "use server";
-    const appliedAt = formData.get("subsidyAppliedAt");
-    const approvedAt = formData.get("subsidyApprovedAt");
-    const disbursedAt = formData.get("subsidyDisbursedAt");
-    await updateSubsidyApplication({
-      connectionId: id,
-      subsidyScheme: String(formData.get("subsidyScheme") || "") || undefined,
-      subsidyApplicationRefNo: String(formData.get("subsidyApplicationRefNo") || "") || undefined,
-      subsidyAppliedAmount: formData.get("subsidyAppliedAmount")
-        ? Number(formData.get("subsidyAppliedAmount"))
-        : undefined,
-      subsidyApprovedAmount: formData.get("subsidyApprovedAmount")
-        ? Number(formData.get("subsidyApprovedAmount"))
-        : undefined,
-      subsidyStatus: formData.get("subsidyStatus") as (typeof SUBSIDY_STATUSES)[number],
-      subsidyAppliedAt: appliedAt ? new Date(String(appliedAt)) : undefined,
-      subsidyApprovedAt: approvedAt ? new Date(String(approvedAt)) : undefined,
-      subsidyDisbursedAt: disbursedAt ? new Date(String(disbursedAt)) : undefined,
+    return asActionResult(() => {
+      const appliedAt = formData.get("subsidyAppliedAt");
+      const approvedAt = formData.get("subsidyApprovedAt");
+      const disbursedAt = formData.get("subsidyDisbursedAt");
+      return updateSubsidyApplication({
+        connectionId: id,
+        subsidyScheme: String(formData.get("subsidyScheme") || "") || undefined,
+        subsidyApplicationRefNo: String(formData.get("subsidyApplicationRefNo") || "") || undefined,
+        subsidyAppliedAmount: formData.get("subsidyAppliedAmount")
+          ? Number(formData.get("subsidyAppliedAmount"))
+          : undefined,
+        subsidyApprovedAmount: formData.get("subsidyApprovedAmount")
+          ? Number(formData.get("subsidyApprovedAmount"))
+          : undefined,
+        subsidyStatus: formData.get("subsidyStatus") as (typeof SUBSIDY_STATUSES)[number],
+        subsidyAppliedAt: appliedAt ? new Date(String(appliedAt)) : undefined,
+        subsidyApprovedAt: approvedAt ? new Date(String(approvedAt)) : undefined,
+        subsidyDisbursedAt: disbursedAt ? new Date(String(disbursedAt)) : undefined,
+      });
     });
   }
 
   async function loanApplicationAction(formData: FormData) {
     "use server";
-    const applicationDate = formData.get("applicationDate");
-    await createLoanApplication({
-      connectionId: id,
-      bankName: String(formData.get("bankName")),
-      applicationNumber: String(formData.get("applicationNumber") || "") || undefined,
-      loanAmount: Number(formData.get("loanAmount")),
-      applicationDate: applicationDate ? new Date(String(applicationDate)) : undefined,
+    return asActionResult(() => {
+      const applicationDate = formData.get("applicationDate");
+      return createLoanApplication({
+        connectionId: id,
+        bankName: String(formData.get("bankName")),
+        applicationNumber: String(formData.get("applicationNumber") || "") || undefined,
+        loanAmount: Number(formData.get("loanAmount")),
+        applicationDate: applicationDate ? new Date(String(applicationDate)) : undefined,
+      });
     });
   }
 
   async function loanUpdateAction(formData: FormData) {
     "use server";
-    const sanctionedAt = formData.get("sanctionedAt");
-    const disbursedAt = formData.get("disbursedAt");
-    const paymentReceivedAt = formData.get("paymentReceivedByProprietorAt");
-    await updateLoanApplication({
-      id: String(formData.get("loanId")),
-      status: formData.get("status") as LoanStatus,
-      sanctionedAt: sanctionedAt ? new Date(String(sanctionedAt)) : undefined,
-      sanctionedAmount: formData.get("sanctionedAmount") ? Number(formData.get("sanctionedAmount")) : undefined,
-      disbursedAmount: formData.get("disbursedAmount") ? Number(formData.get("disbursedAmount")) : undefined,
-      disbursedAt: disbursedAt ? new Date(String(disbursedAt)) : undefined,
-      paymentReceivedByProprietorAmount: formData.get("paymentReceivedByProprietorAmount")
-        ? Number(formData.get("paymentReceivedByProprietorAmount"))
-        : undefined,
-      paymentReceivedByProprietorAt: paymentReceivedAt ? new Date(String(paymentReceivedAt)) : undefined,
-      paymentReference: String(formData.get("paymentReference") || "") || undefined,
-      notes: String(formData.get("loanNotes") || "") || undefined,
+    return asActionResult(() => {
+      const sanctionedAt = formData.get("sanctionedAt");
+      const disbursedAt = formData.get("disbursedAt");
+      const paymentReceivedAt = formData.get("paymentReceivedByProprietorAt");
+      return updateLoanApplication({
+        id: String(formData.get("loanId")),
+        status: formData.get("status") as LoanStatus,
+        sanctionedAt: sanctionedAt ? new Date(String(sanctionedAt)) : undefined,
+        sanctionedAmount: formData.get("sanctionedAmount") ? Number(formData.get("sanctionedAmount")) : undefined,
+        disbursedAmount: formData.get("disbursedAmount") ? Number(formData.get("disbursedAmount")) : undefined,
+        disbursedAt: disbursedAt ? new Date(String(disbursedAt)) : undefined,
+        paymentReceivedByProprietorAmount: formData.get("paymentReceivedByProprietorAmount")
+          ? Number(formData.get("paymentReceivedByProprietorAmount"))
+          : undefined,
+        paymentReceivedByProprietorAt: paymentReceivedAt ? new Date(String(paymentReceivedAt)) : undefined,
+        paymentReference: String(formData.get("paymentReference") || "") || undefined,
+        notes: String(formData.get("loanNotes") || "") || undefined,
+      });
     });
   }
 
   async function installationStatusAction(formData: FormData) {
     "use server";
-    await updateInstallationStatus({
-      connectionId: id,
-      status: formData.get("installationStatus") as InstallationStatus,
-    });
+    return asActionResult(() =>
+      updateInstallationStatus({
+        connectionId: id,
+        status: formData.get("installationStatus") as InstallationStatus,
+      }),
+    );
   }
 
   async function installedEquipmentAction(formData: FormData) {
     "use server";
-    const rowCount = Number(formData.get("equipCount")) || EQUIPMENT_ROW_COUNT_FALLBACK;
-    const items: InstalledEquipmentItem[] = [];
-    for (let i = 0; i < rowCount; i++) {
-      const type = String(formData.get(`equip_${i}_type`) || "");
-      if (!type) continue;
-      items.push({
-        type: type as EquipmentType,
-        brand: String(formData.get(`equip_${i}_brand`) || "") || undefined,
-        model: String(formData.get(`equip_${i}_model`) || "") || undefined,
-        serialNumber: String(formData.get(`equip_${i}_serial`) || "") || undefined,
-        quantity: Number(formData.get(`equip_${i}_qty`) || 1),
-        inventoryItemId: String(formData.get(`equip_${i}_inventoryItemId`) || "") || undefined,
-      });
-    }
-    await updateInstalledEquipment({ connectionId: id, items });
+    return asActionResult(() => {
+      const rowCount = Number(formData.get("equipCount")) || EQUIPMENT_ROW_COUNT_FALLBACK;
+      const items: InstalledEquipmentItem[] = [];
+      for (let i = 0; i < rowCount; i++) {
+        const type = String(formData.get(`equip_${i}_type`) || "");
+        if (!type) continue;
+        items.push({
+          type: type as EquipmentType,
+          brand: String(formData.get(`equip_${i}_brand`) || "") || undefined,
+          model: String(formData.get(`equip_${i}_model`) || "") || undefined,
+          serialNumber: String(formData.get(`equip_${i}_serial`) || "") || undefined,
+          quantity: Number(formData.get(`equip_${i}_qty`) || 1),
+          inventoryItemId: String(formData.get(`equip_${i}_inventoryItemId`) || "") || undefined,
+        });
+      }
+      return updateInstalledEquipment({ connectionId: id, items });
+    });
   }
 
   async function signOffAction(formData: FormData) {
     "use server";
-    await recordInstallationSignOff({
-      connectionId: id,
-      signedOffByName: String(formData.get("signedOffByName")),
-      notes: String(formData.get("installationNotes") || "") || undefined,
-    });
+    return asActionResult(() =>
+      recordInstallationSignOff({
+        connectionId: id,
+        signedOffByName: String(formData.get("signedOffByName")),
+        notes: String(formData.get("installationNotes") || "") || undefined,
+      }),
+    );
   }
 
   async function generateInvoiceAction() {
     "use server";
-    await generateInvoice(id);
+    return asActionResult(() => generateInvoice(id));
   }
 
   async function updateInvoiceAction(formData: FormData) {
     "use server";
     if (!connection.invoice) return;
-    const invoiceDate = formData.get("invoiceDate");
-    await updateInvoice(connection.invoice.id, {
-      lineItems: parseInvoiceLineItemsFromForm(formData),
-      invoiceDate: invoiceDate ? new Date(String(invoiceDate)) : undefined,
-      notes: String(formData.get("notes") || "") || undefined,
+    return asActionResult(() => {
+      const invoiceDate = formData.get("invoiceDate");
+      return updateInvoice(connection.invoice!.id, {
+        lineItems: parseInvoiceLineItemsFromForm(formData),
+        invoiceDate: invoiceDate ? new Date(String(invoiceDate)) : undefined,
+        notes: String(formData.get("notes") || "") || undefined,
+      });
     });
   }
 
   async function warrantyCreateAction(formData: FormData) {
     "use server";
-    await createWarrantyRecord({
-      connectionId: id,
-      equipmentType: formData.get("equipmentType") as EquipmentType,
-      productName: String(formData.get("productName")),
-      manufacturer: String(formData.get("manufacturer") || "") || undefined,
-      model: String(formData.get("model") || "") || undefined,
-      serialNumber: String(formData.get("serialNumber") || "") || undefined,
-      warrantyType: (formData.get("warrantyType") as WarrantyType) || undefined,
-      startDate: new Date(String(formData.get("startDate"))),
-      periodMonths: Number(formData.get("periodMonths")),
-      terms: String(formData.get("terms") || "") || undefined,
-    });
+    return asActionResult(() =>
+      createWarrantyRecord({
+        connectionId: id,
+        equipmentType: formData.get("equipmentType") as EquipmentType,
+        productName: String(formData.get("productName")),
+        manufacturer: String(formData.get("manufacturer") || "") || undefined,
+        model: String(formData.get("model") || "") || undefined,
+        serialNumber: String(formData.get("serialNumber") || "") || undefined,
+        warrantyType: (formData.get("warrantyType") as WarrantyType) || undefined,
+        startDate: new Date(String(formData.get("startDate"))),
+        periodMonths: Number(formData.get("periodMonths")),
+        terms: String(formData.get("terms") || "") || undefined,
+      }),
+    );
   }
 
   async function warrantyDeleteAction(formData: FormData) {
     "use server";
-    await deleteWarrantyRecord({
-      id: String(formData.get("id")),
-      connectionId: id,
-    });
+    return asActionResult(() =>
+      deleteWarrantyRecord({
+        id: String(formData.get("id")),
+        connectionId: id,
+      }),
+    );
   }
 
   async function addNoteAction(formData: FormData) {
     "use server";
-    const followUpAt = formData.get("followUpAt");
-    await addLeadNote({
-      leadId: connection.leadId,
-      body: String(formData.get("body")),
-      followUpAt: followUpAt ? new Date(String(followUpAt)) : undefined,
+    return asActionResult(() => {
+      const followUpAt = formData.get("followUpAt");
+      return addLeadNote({
+        leadId: connection.leadId,
+        body: String(formData.get("body")),
+        followUpAt: followUpAt ? new Date(String(followUpAt)) : undefined,
+      });
     });
   }
 

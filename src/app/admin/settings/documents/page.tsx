@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ActionForm } from "@/components/action-form";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { asActionResult } from "@/lib/actionResult";
 import { DocumentTypeStatusToggle } from "./status-toggle";
 import {
   Table,
@@ -23,15 +24,17 @@ import {
 
 async function createAction(formData: FormData) {
   "use server";
-  await createRequiredDocumentType({
-    name: String(formData.get("name")),
-    description: String(formData.get("description") || "") || undefined,
-  });
+  return asActionResult(() =>
+    createRequiredDocumentType({
+      name: String(formData.get("name")),
+      description: String(formData.get("description") || "") || undefined,
+    }),
+  );
 }
 
 async function deleteAction(formData: FormData) {
   "use server";
-  await deleteRequiredDocumentType(String(formData.get("id")));
+  return asActionResult(() => deleteRequiredDocumentType(String(formData.get("id"))));
 }
 
 export default async function RequiredDocumentsPage() {

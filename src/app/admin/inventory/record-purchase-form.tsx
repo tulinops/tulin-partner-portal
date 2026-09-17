@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ActionForm } from "@/components/action-form";
+import type { ActionResult } from "@/lib/actionResult";
 
 type PurchasableItem = { id: string; name: string; brand: string | null };
 
@@ -14,7 +15,7 @@ export function RecordPurchaseForm({
   action,
 }: {
   items: PurchasableItem[];
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<ActionResult>;
 }) {
   const [brand, setBrand] = useState("");
 
