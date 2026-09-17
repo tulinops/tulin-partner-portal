@@ -65,19 +65,23 @@ export async function deleteRequiredDocumentType(id: string) {
 }
 
 /**
- * Idempotent: creates a NOT_UPLOADED ConnectionDocument for every active
+ * Creates a NOT_UPLOADED ConnectionDocument for every active
  * RequiredDocumentType this tenant has that the connection doesn't already
- * have one for. Safe to call every time the Documents tab loads.
+ * have one for. Safe to call every time the Documents tab loads — except
+ * once a connection's documents are already fully VERIFIED, it's a no-op,
+ * so a document type added later doesn't reopen a connection that already
+ * finished its checklist (and re-flip documentsVerified back to false).
  */
 export async function ensureConnectionDocuments(connectionId: string) {
   const { db, tenantId } = await getTenantDb();
   const connection = await db.connection.findFirst({ where: { id: connectionId } });
   if (!connection) throw new Error("Connection not found");
 
-  const [types, existing] = await Promise.all([
-    db.requiredDocumentType.findMany({ where: { isActive: true } }),
-    db.connectionDocument.findMany({ where: { connectionId } }),
-  ]);
+  const existing = await db.connectionDocument.findMany({ where: { connectionId } });
+  const alreadyVerified = existing.length > 0 && existing.every((d) => d.status === "VERIFIED");
+  if (alreadyVerified) return;
+
+  const types = await db.requiredDocumentType.findMany({ where: { isActive: true } });
   const existingTypeIds = new Set(existing.map((d) => d.requiredDocumentTypeId));
   const missing = types.filter((t) => !existingTypeIds.has(t.id));
   if (missing.length === 0) return;
