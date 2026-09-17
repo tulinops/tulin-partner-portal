@@ -171,8 +171,8 @@ export default async function ConnectionDetailPage({
   const staff = await listStaffMembers();
   const tenant = await getBusinessProfile();
   const inspection = siteInspectionDetails ?? ({} as SiteInspectionDetails);
-  const canCompleteSiteVisit =
-    isInspectionComplete(siteInspectionDetails) && areRequiredSitePhotosComplete(connection.sitePhotos);
+  const sitePhotosComplete = areRequiredSitePhotosComplete(connection.sitePhotos);
+  const canCompleteSiteVisit = isInspectionComplete(siteInspectionDetails) && sitePhotosComplete;
 
   async function recordPaymentAction(formData: FormData) {
     "use server";
@@ -650,7 +650,7 @@ export default async function ConnectionDetailPage({
               initialDetails={inspection}
               currentResult={connection.siteVisitResult}
               initialWorkerNotes={connection.siteVisitWorkerNotes ?? ""}
-              canCompleteSiteVisit={canCompleteSiteVisit}
+              photosComplete={sitePhotosComplete}
             />
           </ActionForm>
         </CardContent>

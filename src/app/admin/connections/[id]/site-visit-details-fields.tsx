@@ -34,12 +34,12 @@ export function SiteVisitDetailsFields({
   initialDetails,
   currentResult,
   initialWorkerNotes,
-  canCompleteSiteVisit,
+  photosComplete,
 }: {
   initialDetails: SiteInspectionDetails;
   currentResult: SiteVisitResult | null;
   initialWorkerNotes: string;
-  canCompleteSiteVisit: boolean;
+  photosComplete: boolean;
 }) {
   const [roofType, setRoofType] = useState(initialDetails.roofType ?? "");
   const [roofCondition, setRoofCondition] = useState(initialDetails.roofCondition ?? "");
@@ -66,6 +66,7 @@ export function SiteVisitDetailsFields({
     otherRequirements,
   ].every((v) => v.trim() !== "");
   const isValid = inspectionValid && result !== null;
+  const resultUnlocked = inspectionValid && photosComplete;
 
   return (
     <>
@@ -178,9 +179,11 @@ export function SiteVisitDetailsFields({
           <Label className="mb-2 block">
             Result <span className="text-destructive">*</span>
           </Label>
-          {!canCompleteSiteVisit && (
+          {!resultUnlocked && (
             <p className="mb-2 text-sm font-medium text-amber-900 dark:text-amber-200">
-              Upload Roof/Meter/Install area photos to unlock the result.
+              {!inspectionValid
+                ? "Fill in all inspection fields above to unlock the result."
+                : "Upload Roof/Meter/Install area photos to unlock the result."}
             </p>
           )}
           <input type="hidden" name="result" value={result ?? ""} />
@@ -191,7 +194,7 @@ export function SiteVisitDetailsFields({
                 type="button"
                 variant={r === result ? "default" : "outline"}
                 size="sm"
-                disabled={!canCompleteSiteVisit}
+                disabled={!resultUnlocked}
                 onClick={() => setResult(r)}
               >
                 {r.replace(/_/g, " ")}
@@ -206,7 +209,7 @@ export function SiteVisitDetailsFields({
       </div>
 
       <div>
-        <Button type="submit" disabled={!isValid || !canCompleteSiteVisit}>
+        <Button type="submit" disabled={!isValid || !photosComplete}>
           Save
         </Button>
       </div>
