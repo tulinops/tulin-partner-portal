@@ -559,7 +559,6 @@ export async function recordInstallationSignOff(input: { connectionId: string; s
   await db.$transaction(async (tx) => {
     const connection = await tx.connection.findFirst({ where: { id: input.connectionId } });
     if (!connection) throw new Error("Connection not found");
-    const alreadySignedOff = connection.installationSignedOffAt !== null;
 
     await tx.connection.update({
       where: { id: input.connectionId },
@@ -602,48 +601,67 @@ export async function recordInstallationSignOff(input: { connectionId: string; s
     }
 
     // Auto-deduct each installed-equipment row that was matched to a stock
-    // item (see InstalledEquipmentItem.inventoryItemId) — once only, on the
-    // first sign-off, so re-submitting "Mark installation complete" never
-    // double-deducts. Unmatched rows (nothing tracked in Inventory for that
-    // item) are simply skipped, same as before this existed.
-    if (!alreadySignedOff) {
-      for (const item of equipment) {
-        if (!item.inventoryItemId || !(item.quantity > 0)) continue;
+    // item (see InstalledEquipmentItem.inventoryItemId). Reconciled against
+    // what's already been allocated to this connection (rather than gated on
+    // "first sign-off only") so re-submitting "Mark installation complete" —
+    // e.g. after mapping a row to inventory that wasn't mapped yet — deducts
+    // just the newly-needed amount instead of silently doing nothing.
+    // Unmatched rows (nothing tracked in Inventory for that item) are simply
+    // skipped, same as before this existed. Note: this only ever deducts —
+    // lowering a row's quantity or swapping its inventory item after stock
+    // was already taken does not return that stock automatically.
+    const neededByItem = new Map<string, number>();
+    for (const item of equipment) {
+      if (!item.inventoryItemId || !(item.quantity > 0)) continue;
+      neededByItem.set(item.inventoryItemId, (neededByItem.get(item.inventoryItemId) ?? 0) + item.quantity);
+    }
 
-        const invItem = await tx.inventoryItem.findFirst({ where: { id: item.inventoryItemId } });
-        if (!invItem) throw new Error(`Inventory item for ${item.type} not found`);
-        if (Number(invItem.runningStock) < item.quantity) {
-          throw new Error(`Not enough stock for ${invItem.name}: ${invItem.runningStock} ${invItem.unit} available`);
-        }
+    const existingAllocations = await tx.inventoryTransaction.groupBy({
+      by: ["inventoryItemId"],
+      where: { connectionId: input.connectionId, type: "ALLOCATION" },
+      _sum: { quantity: true },
+    });
+    const allocatedByItem = new Map(
+      existingAllocations.map((a) => [a.inventoryItemId, Number(a._sum.quantity ?? 0)]),
+    );
 
-        // Weighted-average purchase cost snapshotted onto this allocation —
-        // same approach as the (now-removed) manual "Allocate inventory" form.
-        const purchases = await tx.inventoryTransaction.findMany({
-          where: { inventoryItemId: invItem.id, type: "PURCHASE" },
-          select: { quantity: true, unitCost: true },
-        });
-        const totalPurchasedQty = purchases.reduce((sum, p) => sum + Number(p.quantity), 0);
-        const totalPurchasedCost = purchases.reduce(
-          (sum, p) => sum + Number(p.quantity) * Number(p.unitCost ?? 0),
-          0,
-        );
-        const avgUnitCost = totalPurchasedQty > 0 ? totalPurchasedCost / totalPurchasedQty : 0;
+    for (const [inventoryItemId, neededQty] of neededByItem) {
+      const deltaQty = neededQty - (allocatedByItem.get(inventoryItemId) ?? 0);
+      if (deltaQty <= 0) continue;
 
-        await tx.inventoryTransaction.create({
-          data: {
-            tenantId,
-            inventoryItemId: invItem.id,
-            connectionId: input.connectionId,
-            type: "ALLOCATION",
-            quantity: item.quantity,
-            unitCost: avgUnitCost,
-          },
-        });
-        await tx.inventoryItem.update({
-          where: { id: invItem.id },
-          data: { runningStock: { decrement: item.quantity } },
-        });
+      const invItem = await tx.inventoryItem.findFirst({ where: { id: inventoryItemId } });
+      if (!invItem) throw new Error(`Inventory item not found`);
+      if (Number(invItem.runningStock) < deltaQty) {
+        throw new Error(`Not enough stock for ${invItem.name}: ${invItem.runningStock} ${invItem.unit} available`);
       }
+
+      // Weighted-average purchase cost snapshotted onto this allocation —
+      // same approach as the (now-removed) manual "Allocate inventory" form.
+      const purchases = await tx.inventoryTransaction.findMany({
+        where: { inventoryItemId: invItem.id, type: "PURCHASE" },
+        select: { quantity: true, unitCost: true },
+      });
+      const totalPurchasedQty = purchases.reduce((sum, p) => sum + Number(p.quantity), 0);
+      const totalPurchasedCost = purchases.reduce(
+        (sum, p) => sum + Number(p.quantity) * Number(p.unitCost ?? 0),
+        0,
+      );
+      const avgUnitCost = totalPurchasedQty > 0 ? totalPurchasedCost / totalPurchasedQty : 0;
+
+      await tx.inventoryTransaction.create({
+        data: {
+          tenantId,
+          inventoryItemId: invItem.id,
+          connectionId: input.connectionId,
+          type: "ALLOCATION",
+          quantity: deltaQty,
+          unitCost: avgUnitCost,
+        },
+      });
+      await tx.inventoryItem.update({
+        where: { id: invItem.id },
+        data: { runningStock: { decrement: deltaQty } },
+      });
     }
   });
 
