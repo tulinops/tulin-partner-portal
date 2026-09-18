@@ -1016,6 +1016,7 @@ export default async function ConnectionDetailPage({
   );
   const equipmentInitialRows = installedEquipment.length > 0 ? installedEquipment : estimateEquipmentItems;
 
+  const equipmentLocked = connection.installationStatus === "COMPLETED";
   const installationSection = (
     <div className="space-y-6">
       <Card>
@@ -1051,20 +1052,33 @@ export default async function ConnectionDetailPage({
           </ActionForm>
 
           <div>
-            <p className="mb-2 text-sm font-medium">Installed equipment</p>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <p className="text-sm font-medium">Installed equipment</p>
+              {equipmentLocked && <Badge variant="outline">Locked</Badge>}
+            </div>
+            {equipmentLocked && (
+              <p className="mb-2 text-xs text-muted-foreground">
+                Installation is marked Completed, so equipment can no longer be edited. Change the status above to
+                edit it again.
+              </p>
+            )}
             <ActionForm action={installedEquipmentAction} successMessage="Installed equipment saved" className="space-y-2">
               {/* Forces a remount after every save so edits (brand, serial
                   numbers, etc.) don't look like they vanished — same
                   stale-client-state issue fixed for the Estimate/Invoice editors. */}
-              <InstalledEquipmentEditor
-                key={connection.updatedAt.getTime()}
-                initialItems={equipmentInitialRows}
-                estimateItems={estimateEquipmentItems}
-                inventoryItems={inventoryItemOptions}
-              />
-              <Button type="submit" size="sm">
-                Save
-              </Button>
+              <fieldset disabled={equipmentLocked} className="space-y-2 disabled:opacity-60">
+                <InstalledEquipmentEditor
+                  key={connection.updatedAt.getTime()}
+                  initialItems={equipmentInitialRows}
+                  estimateItems={estimateEquipmentItems}
+                  inventoryItems={inventoryItemOptions}
+                />
+              </fieldset>
+              {!equipmentLocked && (
+                <Button type="submit" size="sm">
+                  Save
+                </Button>
+              )}
             </ActionForm>
           </div>
 

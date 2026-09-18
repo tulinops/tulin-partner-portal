@@ -541,10 +541,17 @@ export async function updateInstallationStatus(input: { connectionId: string; st
   revalidatePath(`/admin/connections/${input.connectionId}`);
 }
 
+function assertInstalledEquipmentEditable(connection: { installationStatus: string }) {
+  if (connection.installationStatus === "COMPLETED") {
+    throw new Error("Installation is marked Completed — change the status above to edit equipment");
+  }
+}
+
 export async function updateInstalledEquipment(input: { connectionId: string; items: InstalledEquipmentItem[] }) {
   const { db } = await getTenantDb();
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
+  assertInstalledEquipmentEditable(connection);
 
   await db.connection.update({
     where: { id: input.connectionId },
