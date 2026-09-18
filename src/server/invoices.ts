@@ -122,8 +122,14 @@ export async function generateInvoice(connectionId: string) {
   return invoice.id;
 }
 
+function assertInvoiceEditable(invoice: { status: string }) {
+  if (invoice.status === "COMPLETE") {
+    throw new Error("This invoice is complete and can no longer be edited");
+  }
+}
+
 // Recomputes totals the same way generateInvoice does — the two must never
-// drift, since an invoice can be edited freely after creation.
+// drift, since an invoice can be edited freely until marked complete.
 export async function updateInvoice(
   invoiceId: string,
   input: {
@@ -135,6 +141,7 @@ export async function updateInvoice(
   const { db } = await getTenantDb();
   const invoice = await db.invoice.findFirst({ where: { id: invoiceId } });
   if (!invoice) throw new Error("Invoice not found");
+  assertInvoiceEditable(invoice);
 
   const items = input.lineItems
     .filter((li) => li.description.trim().length > 0)
@@ -153,6 +160,17 @@ export async function updateInvoice(
       notes: input.notes,
     },
   });
+  revalidatePath(`/admin/connections/${invoice.connectionId}`);
+  revalidatePath(`/admin/invoices/${invoiceId}`);
+}
+
+export async function completeInvoice(invoiceId: string) {
+  const { db } = await getTenantDb();
+  const invoice = await db.invoice.findFirst({ where: { id: invoiceId } });
+  if (!invoice) throw new Error("Invoice not found");
+  assertInvoiceEditable(invoice);
+
+  await db.invoice.update({ where: { id: invoiceId }, data: { status: "COMPLETE" } });
   revalidatePath(`/admin/connections/${invoice.connectionId}`);
   revalidatePath(`/admin/invoices/${invoiceId}`);
 }

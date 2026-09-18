@@ -119,6 +119,11 @@ enum EstimateStatus {
   LOCKED
 }
 
+enum InvoiceStatus {
+  DRAFT
+  COMPLETE
+}
+
 enum SolarBrand {
   WAAREE
   LUMINOUS
@@ -507,6 +512,7 @@ model Invoice {
   gstAmount   Decimal  @default(0) @db.Decimal(12, 2)
   totalAmount Decimal  @db.Decimal(12, 2)
   notes       String? // terms & conditions shown on the printed invoice
+  status      InvoiceStatus @default(DRAFT)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

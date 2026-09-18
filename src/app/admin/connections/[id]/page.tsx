@@ -37,7 +37,7 @@ import { AddWarrantyDialog } from "./add-warranty-dialog";
 import { WarrantyRecordView } from "./warranty-record-view";
 import { EditWarrantyDialog } from "./edit-warranty-dialog";
 import { InvoiceItemsEditor } from "./invoice-items-editor";
-import { generateInvoice, updateInvoice, type InvoiceLineItem } from "@/server/invoices";
+import { generateInvoice, updateInvoice, completeInvoice, type InvoiceLineItem } from "@/server/invoices";
 import { EstimateWorkflowSection } from "@/app/admin/leads/[id]/estimate-workflow-section";
 import { STAGE_LABELS, STAGE_ORDER } from "@/lib/connectionStage";
 import { buildEquipmentFromEstimateLineItems } from "@/lib/installationEquipment";
@@ -349,6 +349,12 @@ export default async function ConnectionDetailPage({
         notes: String(formData.get("notes") || "") || undefined,
       });
     });
+  }
+
+  async function completeInvoiceAction() {
+    "use server";
+    if (!connection.invoice) return;
+    return asActionResult(() => completeInvoice(connection.invoice!.id));
   }
 
   async function warrantyCreateAction(formData: FormData) {
@@ -1142,6 +1148,7 @@ export default async function ConnectionDetailPage({
     // invoice's own (then-flat) GST% rather than 0.
     gstPercent: item.gstPercent ?? Number(connection.invoice?.gstPercent ?? 0),
   }));
+  const invoiceLocked = connection.invoice?.status === "COMPLETE";
   const invoiceSection = (
     <Card>
       <CardHeader>
@@ -1152,8 +1159,8 @@ export default async function ConnectionDetailPage({
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               No invoice yet. Generating one copies the customer&apos;s actual installed equipment into a billable
-              invoice — not the original quotation — so it reflects anything added on-site. It&apos;s fully
-              editable afterward.
+              invoice — not the original quotation — so it reflects anything added on-site. It&apos;s editable
+              until marked complete.
             </p>
             <ActionForm action={generateInvoiceAction} successMessage="Invoice generated">
               <Button type="submit">Generate invoice</Button>
@@ -1162,36 +1169,55 @@ export default async function ConnectionDetailPage({
         ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span className="font-mono text-muted-foreground">{connection.invoice.invoiceNumber}</span>
-              <Link href={`/admin/invoices/${connection.invoice.id}`} target="_blank">
-                <Button type="button" variant="outline" size="sm">
-                  View / Print →
-                </Button>
-              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-muted-foreground">{connection.invoice.invoiceNumber}</span>
+                <StatusBadge tone={invoiceLocked ? "done" : "neutral"} label={invoiceLocked ? "Complete" : "Draft"} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {!invoiceLocked && (
+                  <ActionForm action={completeInvoiceAction} successMessage="Invoice marked complete">
+                    <ConfirmSubmitButton
+                      type="submit"
+                      variant="outline"
+                      size="sm"
+                      confirmMessage="Mark this invoice complete? It can no longer be edited afterward."
+                    >
+                      Mark complete
+                    </ConfirmSubmitButton>
+                  </ActionForm>
+                )}
+                <Link href={`/admin/invoices/${connection.invoice.id}`} target="_blank">
+                  <Button type="button" variant="outline" size="sm">
+                    View / Print →
+                  </Button>
+                </Link>
+              </div>
             </div>
             <ActionForm action={updateInvoiceAction} successMessage="Invoice updated" className="space-y-4">
-              <div className="space-y-2 sm:w-64">
-                <Label htmlFor="invoiceDate">Invoice date</Label>
-                <Input
-                  id="invoiceDate"
-                  name="invoiceDate"
-                  type="date"
-                  defaultValue={connection.invoice.invoiceDate.toISOString().slice(0, 10)}
+              <fieldset disabled={invoiceLocked} className="space-y-4 disabled:opacity-60">
+                <div className="space-y-2 sm:w-64">
+                  <Label htmlFor="invoiceDate">Invoice date</Label>
+                  <Input
+                    id="invoiceDate"
+                    name="invoiceDate"
+                    type="date"
+                    defaultValue={connection.invoice.invoiceDate.toISOString().slice(0, 10)}
+                  />
+                </div>
+                {/* Forces a remount after every save (updatedAt changes on
+                    write) — otherwise React reuses the same instance and its
+                    internal row state never re-syncs with the freshly saved
+                    data, making edits (brand included) look like they vanished. */}
+                <InvoiceItemsEditor
+                  key={connection.invoice.updatedAt.getTime()}
+                  initialItems={invoiceLineItems}
                 />
-              </div>
-              {/* Forces a remount after every save (updatedAt changes on
-                  write) — otherwise React reuses the same instance and its
-                  internal row state never re-syncs with the freshly saved
-                  data, making edits (brand included) look like they vanished. */}
-              <InvoiceItemsEditor
-                key={connection.invoice.updatedAt.getTime()}
-                initialItems={invoiceLineItems}
-              />
-              <div className="space-y-2">
-                <Label htmlFor="notes">Terms &amp; conditions</Label>
-                <Textarea id="notes" name="notes" defaultValue={connection.invoice.notes ?? ""} rows={6} />
-              </div>
-              <Button type="submit">Save changes</Button>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Terms &amp; conditions</Label>
+                  <Textarea id="notes" name="notes" defaultValue={connection.invoice.notes ?? ""} rows={6} />
+                </div>
+              </fieldset>
+              {!invoiceLocked && <Button type="submit">Save changes</Button>}
             </ActionForm>
           </div>
         )}
