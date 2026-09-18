@@ -11,6 +11,8 @@ import {
 } from "@/server/leads";
 import { EstimateBuilderWithPreview } from "./estimate-builder-with-preview";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { ActionForm } from "@/components/action-form";
+import { asActionResult } from "@/lib/actionResult";
 import { SOLAR_BRANDS, brandLabel, type SolarBrandValue } from "@/lib/estimateBrands";
 import { DEFAULT_ESTIMATE_TERMS, DEFAULT_ESTIMATE_ROWS } from "@/lib/estimateDefaults";
 import { isEstimateLocked, STAGE_ORDER, type ConnectionStageKey } from "@/lib/connectionStage";
@@ -130,21 +132,23 @@ export async function EstimateWorkflowSection({
 }) {
   async function newQuotationAction() {
     "use server";
-    await createEstimate({
-      leadId,
-      lineItems: DEFAULT_ESTIMATE_ROWS.map((r) => ({ ...r, amount: 0 })),
-    });
+    return asActionResult(() =>
+      createEstimate({
+        leadId,
+        lineItems: DEFAULT_ESTIMATE_ROWS.map((r) => ({ ...r, amount: 0 })),
+      }),
+    );
   }
 
   if (estimates.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-6 text-center">
         <p className="mb-3 text-sm text-muted-foreground">No quotations yet.</p>
-        <form action={newQuotationAction}>
+        <ActionForm action={newQuotationAction} successMessage="Quotation created">
           <Button type="submit" size="sm">
             + Create first quotation
           </Button>
-        </form>
+        </ActionForm>
       </div>
     );
   }
@@ -168,31 +172,33 @@ export async function EstimateWorkflowSection({
 
   async function duplicateAction() {
     "use server";
-    await duplicateEstimate(active.id);
+    return asActionResult(() => duplicateEstimate(active.id));
   }
 
   async function deleteAction() {
     "use server";
-    await deleteEstimate(active.id);
+    return asActionResult(() => deleteEstimate(active.id));
   }
 
   async function statusAction(formData: FormData) {
     "use server";
-    await updateEstimateStatus(active.id, formData.get("status") as EstimateStatus);
+    return asActionResult(() => updateEstimateStatus(active.id, formData.get("status") as EstimateStatus));
   }
 
   async function saveFieldsAction(formData: FormData) {
     "use server";
-    const systemSizeKw = formData.get("systemSizeKw");
-    const subsidyEstimate = formData.get("subsidyEstimate");
-    const validUntil = formData.get("validUntil");
-    await updateEstimateFields(active.id, {
-      systemSizeKw: systemSizeKw ? Number(systemSizeKw) : undefined,
-      brand: parseBrandFromForm(formData),
-      lineItems: parseLineItemsFromForm(formData),
-      subsidyEstimate: subsidyEstimate ? Number(subsidyEstimate) : undefined,
-      validUntil: validUntil ? new Date(String(validUntil)) : undefined,
-      notes: String(formData.get("notes") || "") || undefined,
+    return asActionResult(() => {
+      const systemSizeKw = formData.get("systemSizeKw");
+      const subsidyEstimate = formData.get("subsidyEstimate");
+      const validUntil = formData.get("validUntil");
+      return updateEstimateFields(active.id, {
+        systemSizeKw: systemSizeKw ? Number(systemSizeKw) : undefined,
+        brand: parseBrandFromForm(formData),
+        lineItems: parseLineItemsFromForm(formData),
+        subsidyEstimate: subsidyEstimate ? Number(subsidyEstimate) : undefined,
+        validUntil: validUntil ? new Date(String(validUntil)) : undefined,
+        notes: String(formData.get("notes") || "") || undefined,
+      });
     });
   }
 
@@ -225,22 +231,22 @@ export async function EstimateWorkflowSection({
           {locked && <Badge variant="outline">Locked</Badge>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <form action={newQuotationAction}>
+          <ActionForm action={newQuotationAction} successMessage="Quotation created">
             <Button type="submit" variant="outline" size="sm">
               + New
             </Button>
-          </form>
-          <form action={duplicateAction}>
+          </ActionForm>
+          <ActionForm action={duplicateAction} successMessage="Quotation duplicated">
             <Button type="submit" variant="outline" size="sm">
               Duplicate
             </Button>
-          </form>
+          </ActionForm>
           {estimates.length > 1 && (
-            <form action={deleteAction}>
+            <ActionForm action={deleteAction} successMessage="Quotation deleted">
               <Button type="submit" variant="outline" size="sm" className="text-destructive">
                 Delete
               </Button>
-            </form>
+            </ActionForm>
           )}
           <Link href={`/admin/estimates/${active.id}`} target="_blank">
             <Button type="button" variant="outline" size="sm">
@@ -257,7 +263,7 @@ export async function EstimateWorkflowSection({
         </p>
       )}
 
-      <form action={statusAction} className="flex flex-wrap items-end gap-2">
+      <ActionForm action={statusAction} successMessage="Status updated" className="flex flex-wrap items-end gap-2">
         <div className="space-y-1">
           {/* Keyed so switching quote tabs (or a save changing updatedAt)
               forces a remount — this is an uncontrolled Select, so without a
@@ -293,9 +299,9 @@ export async function EstimateWorkflowSection({
         >
           Update status
         </ConfirmSubmitButton>
-      </form>
+      </ActionForm>
 
-      <form action={saveFieldsAction} className="space-y-4">
+      <ActionForm action={saveFieldsAction} successMessage="Quotation saved" className="space-y-4">
         <EstimateBuilderWithPreview
           // Forces a full remount (fresh state from initialRows/etc.) both
           // when the displayed quote changes AND after every save (updatedAt
@@ -332,7 +338,7 @@ export async function EstimateWorkflowSection({
           locked={locked}
         />
         {!locked && <Button type="submit">Save changes</Button>}
-      </form>
+      </ActionForm>
     </div>
   );
 }

@@ -8,17 +8,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export default async function ChangePasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ success?: string }>;
+  searchParams: Promise<{ success?: string; error?: string }>;
 }) {
-  const { success } = await searchParams;
+  const { success, error } = await searchParams;
 
   async function changePasswordAction(formData: FormData) {
     "use server";
-    await changePassword({
-      currentPassword: String(formData.get("currentPassword") || ""),
-      newPassword: String(formData.get("newPassword") || ""),
-      confirmPassword: String(formData.get("confirmPassword") || ""),
-    });
+    try {
+      await changePassword({
+        currentPassword: String(formData.get("currentPassword") || ""),
+        newPassword: String(formData.get("newPassword") || ""),
+        confirmPassword: String(formData.get("confirmPassword") || ""),
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      redirect(`/change-password?error=${encodeURIComponent(message)}`);
+    }
     redirect("/change-password?success=1");
   }
 
@@ -35,6 +40,7 @@ export default async function ChangePasswordPage({
               Password updated successfully.
             </p>
           )}
+          {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
           <form action={changePasswordAction} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="currentPassword">Current password</Label>

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { getBusinessProfile, updateBusinessProfile } from "@/server/business-profile";
+import { ActionForm } from "@/components/action-form";
+import { asActionResult } from "@/lib/actionResult";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,12 +14,14 @@ export default async function BusinessProfilePage() {
 
   async function saveAction(formData: FormData) {
     "use server";
-    await updateBusinessProfile({
-      businessAddress: String(formData.get("businessAddress") || "") || undefined,
-      gstin: String(formData.get("gstin") || "") || undefined,
-      contactPhone: String(formData.get("contactPhone") || "") || undefined,
-      contactEmail: String(formData.get("contactEmail") || "") || undefined,
-    });
+    return asActionResult(() =>
+      updateBusinessProfile({
+        businessAddress: String(formData.get("businessAddress") || "") || undefined,
+        gstin: String(formData.get("gstin") || "") || undefined,
+        contactPhone: String(formData.get("contactPhone") || "") || undefined,
+        contactEmail: String(formData.get("contactEmail") || "") || undefined,
+      }),
+    );
   }
 
   return (
@@ -33,7 +37,7 @@ export default async function BusinessProfilePage() {
           <CardTitle>{tenant?.name}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={saveAction} className="space-y-4">
+          <ActionForm action={saveAction} successMessage="Business profile updated" className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="businessAddress">Business address</Label>
               <Textarea
@@ -64,7 +68,7 @@ export default async function BusinessProfilePage() {
             <Button type="submit" size="sm">
               Save
             </Button>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 

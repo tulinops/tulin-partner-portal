@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getLead, addLeadNote, updateLeadDetails } from "@/server/leads";
+import { ActionForm } from "@/components/action-form";
+import { asActionResult } from "@/lib/actionResult";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,22 +41,26 @@ export default async function LeadDetailPage({
 
   async function addNoteAction(formData: FormData) {
     "use server";
-    const followUpAt = formData.get("followUpAt");
-    await addLeadNote({
-      leadId: id,
-      body: String(formData.get("body")),
-      followUpAt: followUpAt ? new Date(String(followUpAt)) : undefined,
+    return asActionResult(() => {
+      const followUpAt = formData.get("followUpAt");
+      return addLeadNote({
+        leadId: id,
+        body: String(formData.get("body")),
+        followUpAt: followUpAt ? new Date(String(followUpAt)) : undefined,
+      });
     });
   }
 
   async function updateDetailsAction(formData: FormData) {
     "use server";
-    await updateLeadDetails({
-      leadId: id,
-      email: String(formData.get("email") || "") || undefined,
-      address: String(formData.get("address") || "") || undefined,
-      requirementNotes: String(formData.get("requirementNotes") || "") || undefined,
-    });
+    return asActionResult(() =>
+      updateLeadDetails({
+        leadId: id,
+        email: String(formData.get("email") || "") || undefined,
+        address: String(formData.get("address") || "") || undefined,
+        requirementNotes: String(formData.get("requirementNotes") || "") || undefined,
+      }),
+    );
   }
 
   const overviewSection = (
@@ -97,7 +103,7 @@ export default async function LeadDetailPage({
         <CardTitle>Lead details</CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={updateDetailsAction} className="space-y-4">
+        <ActionForm action={updateDetailsAction} successMessage="Details saved" className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" defaultValue={lead.email ?? ""} />
@@ -123,7 +129,7 @@ export default async function LeadDetailPage({
           <Button type="submit" size="sm">
             Save details
           </Button>
-        </form>
+        </ActionForm>
       </CardContent>
     </Card>
   );
@@ -162,7 +168,7 @@ export default async function LeadDetailPage({
         <CardTitle>Activity &amp; notes</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <form action={addNoteAction} className="space-y-2">
+        <ActionForm action={addNoteAction} successMessage="Note added" className="space-y-2">
           <Textarea name="body" placeholder="Add a note..." required />
           <div className="flex items-center gap-2">
             <Label htmlFor="followUpAt" className="text-sm text-muted-foreground">
@@ -173,7 +179,7 @@ export default async function LeadDetailPage({
               Add note
             </Button>
           </div>
-        </form>
+        </ActionForm>
         <div className="space-y-3 border-t pt-4">
           {lead.notes.map((note) => (
             <div key={note.id} className="text-sm">

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { listLeads, createLead } from "@/server/leads";
+import { ActionForm } from "@/components/action-form";
+import { asActionResult } from "@/lib/actionResult";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,16 +29,18 @@ const SOURCES = ["INSTAGRAM", "FACEBOOK", "WHATSAPP", "REFERRAL", "OTHER"] as co
 
 async function createLeadAction(formData: FormData) {
   "use server";
-  const estimatedValue = formData.get("estimatedValue");
-  const email = String(formData.get("email") || "");
-  const requirementNotes = String(formData.get("requirementNotes") || "");
-  await createLead({
-    customerName: String(formData.get("customerName")),
-    phone: String(formData.get("phone")),
-    source: formData.get("source") as (typeof SOURCES)[number],
-    estimatedValue: estimatedValue ? Number(estimatedValue) : undefined,
-    email: email || undefined,
-    requirementNotes: requirementNotes || undefined,
+  return asActionResult(() => {
+    const estimatedValue = formData.get("estimatedValue");
+    const email = String(formData.get("email") || "");
+    const requirementNotes = String(formData.get("requirementNotes") || "");
+    return createLead({
+      customerName: String(formData.get("customerName")),
+      phone: String(formData.get("phone")),
+      source: formData.get("source") as (typeof SOURCES)[number],
+      estimatedValue: estimatedValue ? Number(estimatedValue) : undefined,
+      email: email || undefined,
+      requirementNotes: requirementNotes || undefined,
+    });
   });
 }
 
@@ -52,7 +56,7 @@ export default async function LeadsPage() {
           <CardTitle>New Lead</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createLeadAction} className="grid gap-4 sm:grid-cols-4">
+          <ActionForm action={createLeadAction} successMessage="Lead added" className="grid gap-4 sm:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="customerName">Customer name</Label>
               <Input id="customerName" name="customerName" required />
@@ -95,7 +99,7 @@ export default async function LeadsPage() {
             <div className="sm:col-span-4">
               <Button type="submit">Add lead</Button>
             </div>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 

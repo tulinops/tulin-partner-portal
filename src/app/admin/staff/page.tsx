@@ -1,4 +1,6 @@
 import { listAllStaffMembers, createStaffMember } from "@/server/staff";
+import { ActionForm } from "@/components/action-form";
+import { asActionResult } from "@/lib/actionResult";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,12 +12,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 async function createStaffAction(formData: FormData) {
   "use server";
-  await createStaffMember({
-    name: String(formData.get("name")),
-    phone: String(formData.get("phone") || "") || undefined,
-    designation: String(formData.get("designation") || "") || undefined,
-    address: String(formData.get("address") || "") || undefined,
-  });
+  return asActionResult(() =>
+    createStaffMember({
+      name: String(formData.get("name")),
+      phone: String(formData.get("phone") || "") || undefined,
+      designation: String(formData.get("designation") || "") || undefined,
+      address: String(formData.get("address") || "") || undefined,
+    }),
+  );
 }
 
 export default async function StaffPage() {
@@ -34,7 +38,7 @@ export default async function StaffPage() {
           <CardTitle>Add worker</CardTitle>
         </CardHeader>
         <CardContent>
-          <form action={createStaffAction} className="grid gap-4 sm:grid-cols-3">
+          <ActionForm action={createStaffAction} successMessage="Worker added" className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" name="name" required />
@@ -54,7 +58,7 @@ export default async function StaffPage() {
             <div className="flex items-end">
               <Button type="submit">Add worker</Button>
             </div>
-          </form>
+          </ActionForm>
         </CardContent>
       </Card>
 
