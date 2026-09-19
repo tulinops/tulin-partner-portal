@@ -111,10 +111,11 @@ function parseInvoiceLineItemsFromForm(formData: FormData): InvoiceLineItem[] {
   for (let i = 0; i < rowCount; i++) {
     const description = String(formData.get(`item_${i}_description`) || "");
     if (!description.trim()) continue;
+    const rawBrand = String(formData.get(`item_${i}_brand`) || "");
     items.push({
       description,
       spec: String(formData.get(`item_${i}_spec`) || ""),
-      brand: String(formData.get(`item_${i}_brand`) || "") || undefined,
+      brand: rawBrand && rawBrand !== "none" ? rawBrand : undefined,
       qty: Number(formData.get(`item_${i}_qty`) || 0),
       rate: Number(formData.get(`item_${i}_rate`) || 0),
       gstPercent: Number(formData.get(`item_${i}_gstPercent`) || 0),

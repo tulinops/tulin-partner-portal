@@ -13,6 +13,13 @@ import { DEFAULT_ESTIMATE_ROWS, DEFAULT_ITEM_GST_PERCENT, type EstimateBuilderRo
 
 export type { EstimateBuilderRow };
 
+// Radix Select can't take "" as an item value, so the "no brand" choice uses
+// this sentinel and gets translated to/from "" at the edges — without an
+// explicit item for it, the underlying native select (used for the `name`
+// prop / FormData) defaults to its first real option when nothing is picked,
+// silently submitting that brand even though the UI shows a blank placeholder.
+const NO_BRAND = "none";
+
 function money(n: number) {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -161,13 +168,14 @@ export function EstimateBuilderWithPreview({
                   <td className="border p-1">
                     <Select
                       name={`item_${i}_brand`}
-                      value={row.brand ?? ""}
-                      onValueChange={(value) => updateRow(i, "brand", value)}
+                      value={row.brand || NO_BRAND}
+                      onValueChange={(value) => updateRow(i, "brand", value === NO_BRAND ? "" : value)}
                     >
                       <SelectTrigger className="w-32">
                         <SelectValue placeholder="Brand" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value={NO_BRAND}>No brand</SelectItem>
                         {SOLAR_BRANDS.map((b) => (
                           <SelectItem key={b.value} value={b.value}>
                             {b.label}
