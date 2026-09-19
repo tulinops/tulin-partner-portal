@@ -26,6 +26,7 @@ export default async function ConnectionsPage() {
         <TableHeader>
           <TableRow>
             <TableHead>Customer</TableHead>
+            <TableHead>Customer #</TableHead>
             <TableHead>System size</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Collected</TableHead>
@@ -41,6 +42,7 @@ export default async function ConnectionsPage() {
                     {c.customerName}
                   </Link>
                 </TableCell>
+                <TableCell className="font-mono text-muted-foreground">#{c.id.slice(-6).toUpperCase()}</TableCell>
                 <TableCell className="font-mono">{c.systemSizeKw ? `${c.systemSizeKw} kW` : "—"}</TableCell>
                 <TableCell>
                   <ConnectionStatusBadge status={c.status} />
@@ -51,7 +53,7 @@ export default async function ConnectionsPage() {
           })}
           {connections.length === 0 && (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-muted-foreground">
+              <TableCell colSpan={5} className="text-center text-muted-foreground">
                 No connections yet.
               </TableCell>
             </TableRow>
