@@ -3,17 +3,8 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { InvoiceLineItem } from "@/server/invoices";
 import { DEFAULT_ITEM_GST_PERCENT } from "@/lib/estimateDefaults";
-import { SOLAR_BRANDS } from "@/lib/estimateBrands";
-
-// Radix Select can't take "" as an item value, so the "no brand" choice uses
-// this sentinel and gets translated to/from "" at the edges — without an
-// explicit item for it, the underlying native select (used for the `name`
-// prop / FormData) defaults to its first real option when nothing is picked,
-// silently submitting that brand even though the UI shows a blank placeholder.
-const NO_BRAND = "none";
 
 function money(n: number) {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -103,23 +94,11 @@ export function InvoiceItemsEditor({
                   />
                 </td>
                 <td className="border p-1">
-                  <Select
+                  <Input
                     name={`item_${i}_brand`}
-                    value={row.brand || NO_BRAND}
-                    onValueChange={(value) => updateRow(i, "brand", value === NO_BRAND ? "" : value)}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Brand" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NO_BRAND}>No brand</SelectItem>
-                      {SOLAR_BRANDS.map((b) => (
-                        <SelectItem key={b.value} value={b.value}>
-                          {b.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    value={row.brand ?? ""}
+                    onChange={(e) => updateRow(i, "brand", e.target.value)}
+                  />
                 </td>
                 <td className="border p-1">
                   <Input

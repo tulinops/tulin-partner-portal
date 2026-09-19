@@ -3,7 +3,6 @@ import { getInvoice } from "@/server/invoices";
 import type { InvoiceLineItem } from "@/server/invoices";
 import { amountInWords } from "@/lib/amountInWords";
 import { DEFAULT_ESTIMATE_TERMS } from "@/lib/estimateDefaults";
-import { brandLabel } from "@/lib/estimateBrands";
 import { PrintButton } from "@/components/print-button";
 
 function money(n: number) {
@@ -105,7 +104,7 @@ export default async function InvoicePrintPage({
                   <td className="border border-[#999] p-2">{i + 1}</td>
                   <td className="border border-[#999] p-2">{item.description}</td>
                   <td className="border border-[#999] p-2">{item.spec}</td>
-                  <td className="border border-[#999] p-2">{brandLabel(item.brand) ?? "—"}</td>
+                  <td className="border border-[#999] p-2">{item.brand || "—"}</td>
                   <td className="border border-[#999] p-2 text-right">{item.qty}</td>
                   <td className="border border-[#999] p-2 text-right">{money(item.rate)}</td>
                   <td className="border border-[#999] p-2 text-right">{itemGstPercent}%</td>
