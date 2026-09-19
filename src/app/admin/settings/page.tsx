@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getBusinessProfile, updateBusinessProfile } from "@/server/business-profile";
-import { ActionForm } from "@/components/action-form";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { asActionResult } from "@/lib/actionResult";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,7 +37,12 @@ export default async function BusinessProfilePage() {
           <CardTitle>{tenant?.name}</CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={saveAction} successMessage="Business profile updated" className="space-y-4">
+          <ActionForm
+            action={saveAction}
+            successMessage="Business profile updated"
+            disableUntilChanged
+            className="space-y-4"
+          >
             <div className="space-y-2">
               <Label htmlFor="businessAddress">Business address</Label>
               <Textarea
@@ -65,9 +70,7 @@ export default async function BusinessProfilePage() {
                 />
               </div>
             </div>
-            <Button type="submit" size="sm">
-              Save
-            </Button>
+            <SubmitButton size="sm">Save</SubmitButton>
           </ActionForm>
         </CardContent>
       </Card>

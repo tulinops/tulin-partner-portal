@@ -11,7 +11,7 @@ import {
 } from "@/server/leads";
 import { EstimateBuilderWithPreview } from "./estimate-builder-with-preview";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
-import { ActionForm } from "@/components/action-form";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { asActionResult } from "@/lib/actionResult";
 import { SOLAR_BRANDS, brandLabel, type SolarBrandValue } from "@/lib/estimateBrands";
 import { DEFAULT_ESTIMATE_TERMS, DEFAULT_ESTIMATE_ROWS } from "@/lib/estimateDefaults";
@@ -145,9 +145,7 @@ export async function EstimateWorkflowSection({
       <div className="rounded-md border border-dashed p-6 text-center">
         <p className="mb-3 text-sm text-muted-foreground">No quotations yet.</p>
         <ActionForm action={newQuotationAction} successMessage="Quotation created">
-          <Button type="submit" size="sm">
-            + Create first quotation
-          </Button>
+          <SubmitButton size="sm">+ Create first quotation</SubmitButton>
         </ActionForm>
       </div>
     );
@@ -232,20 +230,20 @@ export async function EstimateWorkflowSection({
         </div>
         <div className="flex flex-wrap gap-2">
           <ActionForm action={newQuotationAction} successMessage="Quotation created">
-            <Button type="submit" variant="outline" size="sm">
+            <SubmitButton variant="outline" size="sm">
               + New
-            </Button>
+            </SubmitButton>
           </ActionForm>
           <ActionForm action={duplicateAction} successMessage="Quotation duplicated">
-            <Button type="submit" variant="outline" size="sm">
+            <SubmitButton variant="outline" size="sm">
               Duplicate
-            </Button>
+            </SubmitButton>
           </ActionForm>
           {estimates.length > 1 && (
             <ActionForm action={deleteAction} successMessage="Quotation deleted">
-              <Button type="submit" variant="outline" size="sm" className="text-destructive">
+              <SubmitButton variant="outline" size="sm" className="text-destructive">
                 Delete
-              </Button>
+              </SubmitButton>
             </ActionForm>
           )}
           <Link href={`/admin/estimates/${active.id}`} target="_blank">
@@ -263,7 +261,12 @@ export async function EstimateWorkflowSection({
         </p>
       )}
 
-      <ActionForm action={statusAction} successMessage="Status updated" className="flex flex-wrap items-end gap-2">
+      <ActionForm
+        action={statusAction}
+        successMessage="Status updated"
+        disableUntilChanged
+        className="flex flex-wrap items-end gap-2"
+      >
         <div className="space-y-1">
           {/* Keyed so switching quote tabs (or a save changing updatedAt)
               forces a remount — this is an uncontrolled Select, so without a
@@ -301,7 +304,12 @@ export async function EstimateWorkflowSection({
         </ConfirmSubmitButton>
       </ActionForm>
 
-      <ActionForm action={saveFieldsAction} successMessage="Quotation saved" className="space-y-4">
+      <ActionForm
+        action={saveFieldsAction}
+        successMessage="Quotation saved"
+        disableUntilChanged
+        className="space-y-4"
+      >
         <EstimateBuilderWithPreview
           // Forces a full remount (fresh state from initialRows/etc.) both
           // when the displayed quote changes AND after every save (updatedAt
@@ -337,7 +345,7 @@ export async function EstimateWorkflowSection({
           initialNotes={active.notes ?? DEFAULT_ESTIMATE_TERMS}
           locked={locked}
         />
-        {!locked && <Button type="submit">Save changes</Button>}
+        {!locked && <SubmitButton>Save changes</SubmitButton>}
       </ActionForm>
     </div>
   );

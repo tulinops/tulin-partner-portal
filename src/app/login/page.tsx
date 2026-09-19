@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { auth, signIn } from "@/auth";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/action-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -67,9 +67,7 @@ export default async function LoginPage({
               {error && (
                 <p className="text-sm text-destructive">Invalid email or password.</p>
               )}
-              <Button type="submit" className="w-full">
-                Sign in
-              </Button>
+              <SubmitButton className="w-full">Sign in</SubmitButton>
             </form>
           </CardContent>
         </Card>

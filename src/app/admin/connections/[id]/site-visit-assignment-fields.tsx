@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/action-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -122,9 +122,7 @@ export function SiteVisitAssignmentFields({
         />
       </div>
       <div>
-        <Button type="submit" disabled={!isValid}>
-          Save assignment
-        </Button>
+        <SubmitButton disabled={!isValid}>Save assignment</SubmitButton>
       </div>
     </>
   );

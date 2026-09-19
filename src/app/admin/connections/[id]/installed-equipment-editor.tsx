@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useActionFormState } from "@/components/action-form";
 import { EQUIPMENT_TYPES } from "@/lib/installationEquipment";
 import { SOLAR_BRANDS } from "@/lib/estimateBrands";
 import type { InstalledEquipmentItem } from "@/server/connections";
@@ -26,6 +27,13 @@ export function InstalledEquipmentEditor({
   inventoryItems: InventoryItemOption[];
 }) {
   const [rows, setRows] = useState<InstalledEquipmentItem[]>(initialItems);
+  // The inventory-item picker below is a controlled Select paired with a
+  // manually-managed hidden input (no `name` on the Select itself, since its
+  // value needs the "none" -> "" translation) — updating that hidden input's
+  // value via React re-render doesn't fire a native change event, so a
+  // parent ActionForm's disableUntilChanged wouldn't otherwise notice this
+  // edit. markDirty() closes that gap explicitly.
+  const { markDirty } = useActionFormState();
 
   function updateRow(i: number, field: keyof InstalledEquipmentItem, value: string) {
     setRows((prev) =>
@@ -36,6 +44,7 @@ export function InstalledEquipmentEditor({
         return { ...r, [field]: value };
       }),
     );
+    if (field === "inventoryItemId") markDirty();
   }
 
   function addRow() {

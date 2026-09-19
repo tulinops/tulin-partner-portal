@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getLead, addLeadNote, updateLeadDetails } from "@/server/leads";
-import { ActionForm } from "@/components/action-form";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { asActionResult } from "@/lib/actionResult";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -103,7 +102,12 @@ export default async function LeadDetailPage({
         <CardTitle>Lead details</CardTitle>
       </CardHeader>
       <CardContent>
-        <ActionForm action={updateDetailsAction} successMessage="Details saved" className="space-y-4">
+        <ActionForm
+          action={updateDetailsAction}
+          successMessage="Details saved"
+          disableUntilChanged
+          className="space-y-4"
+        >
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" defaultValue={lead.email ?? ""} />
@@ -126,9 +130,7 @@ export default async function LeadDetailPage({
               placeholder="What the customer is asking for (roof type, monthly bill, budget, etc.)"
             />
           </div>
-          <Button type="submit" size="sm">
-            Save details
-          </Button>
+          <SubmitButton size="sm">Save details</SubmitButton>
         </ActionForm>
       </CardContent>
     </Card>
@@ -168,16 +170,14 @@ export default async function LeadDetailPage({
         <CardTitle>Activity &amp; notes</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ActionForm action={addNoteAction} successMessage="Note added" className="space-y-2">
+        <ActionForm action={addNoteAction} successMessage="Note added" disableUntilChanged className="space-y-2">
           <Textarea name="body" placeholder="Add a note..." required />
           <div className="flex items-center gap-2">
             <Label htmlFor="followUpAt" className="text-sm text-muted-foreground">
               Follow up on
             </Label>
             <Input id="followUpAt" name="followUpAt" type="date" className="w-auto" />
-            <Button type="submit" size="sm">
-              Add note
-            </Button>
+            <SubmitButton size="sm">Add note</SubmitButton>
           </div>
         </ActionForm>
         <div className="space-y-3 border-t pt-4">

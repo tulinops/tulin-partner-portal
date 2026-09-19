@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ActionForm } from "@/components/action-form";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import type { ActionResult } from "@/lib/actionResult";
 
 type PurchasableItem = { id: string; name: string; brand: string | null };
@@ -20,7 +19,12 @@ export function RecordPurchaseForm({
   const [brand, setBrand] = useState("");
 
   return (
-    <ActionForm action={action} successMessage="Purchase recorded" className="grid gap-4 sm:grid-cols-4">
+    <ActionForm
+      action={action}
+      successMessage="Purchase recorded"
+      disableUntilChanged
+      className="grid gap-4 sm:grid-cols-4"
+    >
       <div className="space-y-2 sm:col-span-2">
         <Label htmlFor="inventoryItemId">Item</Label>
         <Select
@@ -65,7 +69,7 @@ export function RecordPurchaseForm({
         <Input id="purchaseSupplier" name="purchaseSupplier" />
       </div>
       <div className="sm:col-span-4">
-        <Button type="submit">Record purchase</Button>
+        <SubmitButton>Record purchase</SubmitButton>
       </div>
     </ActionForm>
   );

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { changePassword } from "@/server/account";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/action-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -74,7 +74,7 @@ export default async function ChangePasswordPage({
                 autoComplete="new-password"
               />
             </div>
-            <Button type="submit">Update password</Button>
+            <SubmitButton>Update password</SubmitButton>
           </form>
         </CardContent>
       </Card>

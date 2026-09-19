@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { listLeads, createLead } from "@/server/leads";
-import { ActionForm } from "@/components/action-form";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { asActionResult } from "@/lib/actionResult";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { StatusBadge, LEAD_STAGE_TONE } from "@/components/status-badge";
@@ -56,7 +55,12 @@ export default async function LeadsPage() {
           <CardTitle>New Lead</CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={createLeadAction} successMessage="Lead added" className="grid gap-4 sm:grid-cols-4">
+          <ActionForm
+            action={createLeadAction}
+            successMessage="Lead added"
+            disableUntilChanged
+            className="grid gap-4 sm:grid-cols-4"
+          >
             <div className="space-y-2">
               <Label htmlFor="customerName">Customer name</Label>
               <Input id="customerName" name="customerName" required />
@@ -97,7 +101,7 @@ export default async function LeadsPage() {
               />
             </div>
             <div className="sm:col-span-4">
-              <Button type="submit">Add lead</Button>
+              <SubmitButton>Add lead</SubmitButton>
             </div>
           </ActionForm>
         </CardContent>

@@ -58,7 +58,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge, CONNECTION_STATUS_TONE } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionForm } from "@/components/action-form";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { asActionResult } from "@/lib/actionResult";
 import {
@@ -618,7 +618,12 @@ export default async function ConnectionDetailPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={siteVisitAssignmentAction} successMessage="Site visit assignment saved" className="grid gap-4 sm:grid-cols-2">
+          <ActionForm
+            action={siteVisitAssignmentAction}
+            successMessage="Site visit assignment saved"
+            disableUntilChanged
+            className="grid gap-4 sm:grid-cols-2"
+          >
             <SiteVisitAssignmentFields
               key={connection.updatedAt.getTime()}
               staff={staff}
@@ -649,6 +654,7 @@ export default async function ConnectionDetailPage({
           <ActionForm
             action={siteVisitDetailsAction}
             successMessage="Site visit details saved"
+            disableUntilChanged
             className="space-y-6"
           >
             <SiteVisitDetailsFields
@@ -731,7 +737,12 @@ export default async function ConnectionDetailPage({
           <CardTitle>Record customer payment</CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={recordPaymentAction} successMessage="Payment recorded" className="grid gap-4 sm:grid-cols-3">
+          <ActionForm
+            action={recordPaymentAction}
+            successMessage="Payment recorded"
+            disableUntilChanged
+            className="grid gap-4 sm:grid-cols-3"
+          >
             <div className="space-y-2">
               <Label htmlFor="amount">Amount (₹)</Label>
               <Input id="amount" name="amount" type="number" step="0.01" required />
@@ -741,7 +752,7 @@ export default async function ConnectionDetailPage({
               <Input id="note" name="note" />
             </div>
             <div className="flex items-end">
-              <Button type="submit">Record payment</Button>
+              <SubmitButton>Record payment</SubmitButton>
             </div>
           </ActionForm>
         </CardContent>
@@ -766,7 +777,12 @@ export default async function ConnectionDetailPage({
               Tracking-only — this is credited by the government directly to the customer&apos;s own bank account, never
               to us. Never sum this into revenue.
             </p>
-            <ActionForm action={subsidyAction} successMessage="Subsidy application saved" className="grid gap-4 sm:grid-cols-3">
+            <ActionForm
+              action={subsidyAction}
+              successMessage="Subsidy application saved"
+              disableUntilChanged
+              className="grid gap-4 sm:grid-cols-3"
+            >
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="subsidyScheme">Scheme</Label>
                 <Input id="subsidyScheme" name="subsidyScheme" defaultValue={connection.subsidyScheme ?? ""} />
@@ -846,7 +862,7 @@ export default async function ConnectionDetailPage({
                 />
               </div>
               <div className="flex items-end">
-                <Button type="submit">Save subsidy application</Button>
+                <SubmitButton>Save subsidy application</SubmitButton>
               </div>
             </ActionForm>
           </CardContent>
@@ -876,7 +892,12 @@ export default async function ConnectionDetailPage({
                     </p>
                   )}
                 </div>
-                <ActionForm action={loanUpdateAction} successMessage="Loan application updated" className="grid gap-4 sm:grid-cols-3">
+                <ActionForm
+                  action={loanUpdateAction}
+                  successMessage="Loan application updated"
+                  disableUntilChanged
+                  className="grid gap-4 sm:grid-cols-3"
+                >
                   <input type="hidden" name="loanId" value={currentLoanApplication.id} />
                   <div className="space-y-2">
                     <Label htmlFor="loanStatus">Status</Label>
@@ -971,12 +992,17 @@ export default async function ConnectionDetailPage({
                     <Textarea id="loanNotes" name="loanNotes" defaultValue={currentLoanApplication.notes ?? ""} />
                   </div>
                   <div>
-                    <Button type="submit">Save</Button>
+                    <SubmitButton>Save</SubmitButton>
                   </div>
                 </ActionForm>
               </>
             ) : (
-              <ActionForm action={loanApplicationAction} successMessage="Loan application created" className="grid gap-4 sm:grid-cols-3">
+              <ActionForm
+                action={loanApplicationAction}
+                successMessage="Loan application created"
+                disableUntilChanged
+                className="grid gap-4 sm:grid-cols-3"
+              >
                 <div className="space-y-2">
                   <Label htmlFor="bankName">Bank / NBFC</Label>
                   <Input id="bankName" name="bankName" required />
@@ -994,7 +1020,7 @@ export default async function ConnectionDetailPage({
                   <Input id="applicationDate" name="applicationDate" type="date" />
                 </div>
                 <div className="flex items-end">
-                  <Button type="submit">Create loan application</Button>
+                  <SubmitButton>Create loan application</SubmitButton>
                 </div>
               </ActionForm>
             )}
@@ -1024,7 +1050,12 @@ export default async function ConnectionDetailPage({
           <CardTitle>Installation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <ActionForm action={installationStatusAction} successMessage="Installation status saved" className="flex flex-wrap items-end gap-4">
+          <ActionForm
+            action={installationStatusAction}
+            successMessage="Installation status saved"
+            disableUntilChanged
+            className="flex flex-wrap items-end gap-4"
+          >
             <div className="space-y-2">
               <Label htmlFor="installationStatus">Status</Label>
               {/* Keyed so this re-syncs after recordInstallationSignOff sets
@@ -1048,7 +1079,7 @@ export default async function ConnectionDetailPage({
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit">Save status</Button>
+            <SubmitButton>Save status</SubmitButton>
           </ActionForm>
 
           <div>
@@ -1062,7 +1093,12 @@ export default async function ConnectionDetailPage({
                 edit it again.
               </p>
             )}
-            <ActionForm action={installedEquipmentAction} successMessage="Installed equipment saved" className="space-y-2">
+            <ActionForm
+              action={installedEquipmentAction}
+              successMessage="Installed equipment saved"
+              disableUntilChanged
+              className="space-y-2"
+            >
               {/* Forces a remount after every save so edits (brand, serial
                   numbers, etc.) don't look like they vanished — same
                   stale-client-state issue fixed for the Estimate/Invoice editors. */}
@@ -1074,11 +1110,7 @@ export default async function ConnectionDetailPage({
                   inventoryItems={inventoryItemOptions}
                 />
               </fieldset>
-              {!equipmentLocked && (
-                <Button type="submit" size="sm">
-                  Save
-                </Button>
-              )}
+              {!equipmentLocked && <SubmitButton size="sm">Save</SubmitButton>}
             </ActionForm>
           </div>
 
@@ -1097,7 +1129,7 @@ export default async function ConnectionDetailPage({
               <Textarea id="installationNotes" name="installationNotes" defaultValue={connection.installationNotes ?? ""} />
             </div>
             <div>
-              <Button type="submit">Mark installation complete</Button>
+              <SubmitButton>Mark installation complete</SubmitButton>
             </div>
             {connection.installationSignedOffAt && (
               <p className="text-xs text-muted-foreground sm:col-span-3">
@@ -1177,7 +1209,7 @@ export default async function ConnectionDetailPage({
               until marked complete.
             </p>
             <ActionForm action={generateInvoiceAction} successMessage="Invoice generated">
-              <Button type="submit">Generate invoice</Button>
+              <SubmitButton>Generate invoice</SubmitButton>
             </ActionForm>
           </div>
         ) : (
@@ -1207,7 +1239,12 @@ export default async function ConnectionDetailPage({
                 </Link>
               </div>
             </div>
-            <ActionForm action={updateInvoiceAction} successMessage="Invoice updated" className="space-y-4">
+            <ActionForm
+              action={updateInvoiceAction}
+              successMessage="Invoice updated"
+              disableUntilChanged
+              className="space-y-4"
+            >
               <fieldset disabled={invoiceLocked} className="space-y-4 disabled:opacity-60">
                 <div className="space-y-2 sm:w-64">
                   <Label htmlFor="invoiceDate">Invoice date</Label>
@@ -1231,7 +1268,7 @@ export default async function ConnectionDetailPage({
                   <Textarea id="notes" name="notes" defaultValue={connection.invoice.notes ?? ""} rows={6} />
                 </div>
               </fieldset>
-              {!invoiceLocked && <Button type="submit">Save changes</Button>}
+              {!invoiceLocked && <SubmitButton>Save changes</SubmitButton>}
             </ActionForm>
           </div>
         )}
@@ -1327,9 +1364,14 @@ export default async function ConnectionDetailPage({
         </Table>
 
         <AddWarrantyDialog key={warrantyRecordsWithExpiry.length}>
-          <ActionForm action={warrantyCreateAction} successMessage="Warranty record added" className="space-y-4">
+          <ActionForm
+            action={warrantyCreateAction}
+            successMessage="Warranty record added"
+            disableUntilChanged
+            className="space-y-4"
+          >
             <WarrantyRecordForm installedEquipment={installedEquipment} />
-            <Button type="submit">Add warranty record</Button>
+            <SubmitButton>Add warranty record</SubmitButton>
           </ActionForm>
         </AddWarrantyDialog>
       </CardContent>
@@ -1342,16 +1384,14 @@ export default async function ConnectionDetailPage({
         <CardTitle>Activity &amp; notes</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ActionForm action={addNoteAction} successMessage="Note added" className="space-y-2">
+        <ActionForm action={addNoteAction} successMessage="Note added" disableUntilChanged className="space-y-2">
           <Textarea name="body" placeholder="Add a note..." required />
           <div className="flex items-center gap-2">
             <Label htmlFor="followUpAt" className="text-sm text-muted-foreground">
               Follow up on
             </Label>
             <Input id="followUpAt" name="followUpAt" type="date" className="w-auto" />
-            <Button type="submit" size="sm">
-              Add note
-            </Button>
+            <SubmitButton size="sm">Add note</SubmitButton>
           </div>
         </ActionForm>
         <div className="space-y-3 border-t pt-4">

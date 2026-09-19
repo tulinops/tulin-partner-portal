@@ -4,12 +4,11 @@ import {
   createRequiredDocumentType,
   deleteRequiredDocumentType,
 } from "@/server/documents";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionForm } from "@/components/action-form";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { asActionResult } from "@/lib/actionResult";
 import { DocumentTypeStatusToggle } from "./status-toggle";
@@ -53,7 +52,12 @@ export default async function RequiredDocumentsPage() {
           <CardTitle>Add document type</CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={createAction} successMessage="Document type added" className="grid gap-4 sm:grid-cols-3">
+          <ActionForm
+            action={createAction}
+            successMessage="Document type added"
+            disableUntilChanged
+            className="grid gap-4 sm:grid-cols-3"
+          >
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" name="name" required placeholder="e.g. Identity proof" />
@@ -63,7 +67,7 @@ export default async function RequiredDocumentsPage() {
               <Input id="description" name="description" />
             </div>
             <div className="flex items-end">
-              <Button type="submit">Add</Button>
+              <SubmitButton>Add</SubmitButton>
             </div>
           </ActionForm>
         </CardContent>

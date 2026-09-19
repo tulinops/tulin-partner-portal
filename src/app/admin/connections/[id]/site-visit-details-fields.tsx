@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/action-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useActionFormState } from "@/components/action-form";
 import type { SiteInspectionDetails } from "@/server/connections";
 import type { SiteVisitResult } from "@/generated/prisma/enums";
 
@@ -53,6 +55,11 @@ export function SiteVisitDetailsFields({
   const [meterInformation, setMeterInformation] = useState(initialDetails.meterInformation ?? "");
   const [otherRequirements, setOtherRequirements] = useState(initialDetails.otherRequirements ?? "");
   const [result, setResult] = useState<SiteVisitResult | null>(currentResult);
+  // The result buttons below drive a manually-managed hidden input (no
+  // native form control), so picking a result alone wouldn't otherwise be
+  // seen by a parent ActionForm's disableUntilChanged — markDirty() closes
+  // that gap explicitly.
+  const { markDirty } = useActionFormState();
 
   const inspectionValid = [
     roofType,
@@ -195,7 +202,10 @@ export function SiteVisitDetailsFields({
                 variant={r === result ? "default" : "outline"}
                 size="sm"
                 disabled={!resultUnlocked}
-                onClick={() => setResult(r)}
+                onClick={() => {
+                  setResult(r);
+                  markDirty();
+                }}
               >
                 {r.replace(/_/g, " ")}
               </Button>
@@ -209,9 +219,7 @@ export function SiteVisitDetailsFields({
       </div>
 
       <div>
-        <Button type="submit" disabled={!isValid || !photosComplete}>
-          Save
-        </Button>
+        <SubmitButton disabled={!isValid || !photosComplete}>Save</SubmitButton>
       </div>
     </>
   );

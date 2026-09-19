@@ -1,11 +1,10 @@
 import { X } from "lucide-react";
 import { listInventoryItems, createInventoryItem, recordPurchase, deleteInventoryItem } from "@/server/inventory";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ActionForm } from "@/components/action-form";
+import { ActionForm, SubmitButton } from "@/components/action-form";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { asActionResult } from "@/lib/actionResult";
 import { EditItemDialog } from "./edit-item-dialog";
@@ -69,7 +68,12 @@ export default async function InventoryPage() {
           <CardTitle>New item type</CardTitle>
         </CardHeader>
         <CardContent>
-          <ActionForm action={createItemAction} successMessage="Item added" className="grid gap-4 sm:grid-cols-5">
+          <ActionForm
+            action={createItemAction}
+            successMessage="Item added"
+            disableUntilChanged
+            className="grid gap-4 sm:grid-cols-5"
+          >
             <div className="space-y-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" name="name" placeholder="540W Mono Panel" required />
@@ -87,7 +91,7 @@ export default async function InventoryPage() {
               <Input id="supplier" name="supplier" />
             </div>
             <div className="sm:col-span-5">
-              <Button type="submit">Add item</Button>
+              <SubmitButton>Add item</SubmitButton>
             </div>
           </ActionForm>
         </CardContent>

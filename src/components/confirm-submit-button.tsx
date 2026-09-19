@@ -2,6 +2,7 @@
 
 import type { ComponentProps } from "react";
 import { Button } from "@/components/ui/button";
+import { useActionFormState } from "@/components/action-form";
 
 // A plain <Button type="submit"> inside a <form action={...}> triggers the
 // server action immediately on click — this intercepts that click with a
@@ -15,6 +16,7 @@ export function ConfirmSubmitButton({
   confirmMessage,
   confirmWhenFieldEquals,
   skipConfirm,
+  disabled,
   onClick,
   ...props
 }: ComponentProps<typeof Button> & {
@@ -22,9 +24,11 @@ export function ConfirmSubmitButton({
   confirmWhenFieldEquals?: { name: string; value: string };
   skipConfirm?: boolean;
 }) {
+  const { pending, dirty } = useActionFormState();
   return (
     <Button
       {...props}
+      disabled={pending || !dirty || disabled}
       onClick={(event) => {
         const form = event.currentTarget.closest("form");
         const fieldMatches =

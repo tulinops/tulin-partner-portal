@@ -1,8 +1,37 @@
 "use client";
 
-import { useTransition, type ReactNode } from "react";
+import { createContext, useContext, useState, useTransition, type ComponentProps, type ReactNode } from "react";
+import { useFormStatus } from "react-dom";
 import { toast } from "sonner";
 import type { ActionResult } from "@/lib/actionResult";
+import { Button } from "@/components/ui/button";
+
+type ActionFormState = { pending: boolean; dirty: boolean; markDirty: () => void };
+
+const ActionFormContext = createContext<ActionFormState>({
+  pending: false,
+  dirty: true,
+  markDirty: () => {},
+});
+
+// Exposes ActionForm's pending/dirty state to descendants. Also falls back to
+// react-dom's useFormStatus so the same hook works for a plain
+// <form action={...}> outside any ActionForm (e.g. Login, Change password) —
+// ActionForm's own form is submitted via onSubmit, not a real form action, so
+// useFormStatus alone can't see its pending state, hence reading both.
+export function useActionFormState(): ActionFormState {
+  const ctx = useContext(ActionFormContext);
+  const formStatus = useFormStatus();
+  return { pending: ctx.pending || formStatus.pending, dirty: ctx.dirty, markDirty: ctx.markDirty };
+}
+
+// Drop-in replacement for a plain <button type="submit">: disables itself
+// while the enclosing form is submitting, and (if the enclosing ActionForm
+// opted into disableUntilChanged) until something's actually been changed.
+export function SubmitButton({ disabled, ...props }: ComponentProps<typeof Button>) {
+  const { pending, dirty } = useActionFormState();
+  return <Button type="submit" disabled={pending || !dirty || disabled} {...props} />;
+}
 
 // Drop-in replacement for <form action={serverAction}> that adds a
 // success/failure toast. Works with any existing "use server" action
@@ -16,13 +45,21 @@ export function ActionForm({
   successMessage,
   className,
   children,
+  disableUntilChanged,
 }: {
   action: (formData: FormData) => Promise<ActionResult>;
   successMessage: string;
   className?: string;
   children: ReactNode;
+  // Keeps the submit button disabled until a field changes (or a descendant
+  // calls markDirty() for a state change that isn't a native form event —
+  // e.g. a custom button-group bound to a hidden input). Off by default so
+  // existing forms are unaffected; opt in only for forms where saving with
+  // nothing changed is never a deliberate action.
+  disableUntilChanged?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const [dirty, setDirty] = useState(!disableUntilChanged);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,6 +77,7 @@ export function ActionForm({
           toast.error(result.error);
         } else {
           toast.success(successMessage);
+          if (disableUntilChanged) setDirty(false);
         }
       } catch (err) {
         // Only reached for an error asActionResult chose to rethrow (an
@@ -51,8 +89,15 @@ export function ActionForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className={className} aria-busy={pending}>
-      {children}
+    <form
+      onSubmit={handleSubmit}
+      onChange={disableUntilChanged ? () => setDirty(true) : undefined}
+      className={className}
+      aria-busy={pending}
+    >
+      <ActionFormContext.Provider value={{ pending, dirty, markDirty: () => setDirty(true) }}>
+        {children}
+      </ActionFormContext.Provider>
     </form>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useActionFormState } from "@/components/action-form";
 import {
   EQUIPMENT_TYPES,
   WARRANTY_TYPES,
@@ -16,12 +17,24 @@ import type { InstalledEquipmentItem } from "@/server/connections";
 export function WarrantyRecordForm({ installedEquipment }: { installedEquipment: InstalledEquipmentItem[] }) {
   const [selected, setSelected] = useState("custom");
   const item = selected === "custom" ? null : installedEquipment[Number(selected)];
+  // This picker has no `name` (it only drives the defaultValues of the
+  // fields below via `key`, it isn't itself submitted), so it never fires a
+  // native form event a parent ActionForm's disableUntilChanged would see —
+  // markDirty() covers the case where someone picks a prefill and submits
+  // without separately touching any of the fields it just filled in.
+  const { markDirty } = useActionFormState();
 
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <div className="space-y-2 sm:col-span-3">
         <Label htmlFor="equipmentPicker">Add from installed equipment</Label>
-        <Select value={selected} onValueChange={setSelected}>
+        <Select
+          value={selected}
+          onValueChange={(value) => {
+            setSelected(value);
+            markDirty();
+          }}
+        >
           <SelectTrigger id="equipmentPicker">
             <SelectValue />
           </SelectTrigger>
