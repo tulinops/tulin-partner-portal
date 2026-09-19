@@ -162,8 +162,16 @@ export type SiteInspectionDetails = {
 async function assertCanCompleteSiteVisit(
   db: Awaited<ReturnType<typeof getTenantDb>>["db"],
   connectionId: string,
-  connection: { siteInspectionDetails: unknown },
+  connection: {
+    siteInspectionDetails: unknown;
+    staffMemberId: string | null;
+    siteVisitScheduledAt: Date | null;
+    siteVisitInstructions: string | null;
+  },
 ) {
+  if (!connection.staffMemberId || !connection.siteVisitScheduledAt || !connection.siteVisitInstructions) {
+    throw new Error("Assign a worker, visit date, and instructions before marking the site visit complete.");
+  }
   const details = (connection.siteInspectionDetails ?? null) as SiteInspectionDetails | null;
   const photos = await db.sitePhoto.findMany({ where: { connectionId }, select: { category: true } });
   if (!isInspectionComplete(details) || !areRequiredSitePhotosComplete(photos)) {
@@ -229,6 +237,12 @@ export async function updateConnectionStatus(input: {
   revalidatePath("/admin/connections");
 }
 
+function assertSiteVisitAssignmentEditable(connection: { siteVisitStatus: string }) {
+  if (connection.siteVisitStatus === "COMPLETED") {
+    throw new Error("Site visit is complete — change the status to edit the assignment");
+  }
+}
+
 export async function assignSiteVisit(input: {
   connectionId: string;
   staffMemberId?: string;
@@ -238,6 +252,7 @@ export async function assignSiteVisit(input: {
   const { db } = await getTenantDb();
   const connection = await db.connection.findFirst({ where: { id: input.connectionId } });
   if (!connection) throw new Error("Connection not found");
+  assertSiteVisitAssignmentEditable(connection);
 
   await db.connection.update({
     where: { id: input.connectionId },

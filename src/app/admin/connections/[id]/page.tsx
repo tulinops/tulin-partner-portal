@@ -26,7 +26,7 @@ import { listStaffMembers } from "@/server/staff";
 import { addLeadNote, type EstimateLineItem } from "@/server/leads";
 import { getBusinessProfile } from "@/server/business-profile";
 import { SitePhotos } from "./site-photos";
-import { SiteVisitAssignmentFields } from "./site-visit-assignment-fields";
+import { SiteVisitStatusField, SiteVisitAssignmentFields } from "./site-visit-assignment-fields";
 import { SiteVisitDetailsFields } from "./site-visit-details-fields";
 import { DocumentRow } from "./document-row";
 import { CustomerTabs } from "./customer-tabs";
@@ -185,19 +185,25 @@ export default async function ConnectionDetailPage({
     );
   }
 
+  async function siteVisitStatusAction(formData: FormData) {
+    "use server";
+    return asActionResult(() =>
+      updateSiteVisitStatus({
+        connectionId: id,
+        status: formData.get("siteVisitStatus") as SiteVisitStatus,
+      }),
+    );
+  }
+
   async function siteVisitAssignmentAction(formData: FormData) {
     "use server";
-    return asActionResult(async () => {
+    return asActionResult(() => {
       const scheduledAt = formData.get("siteVisitScheduledAt");
-      await assignSiteVisit({
+      return assignSiteVisit({
         connectionId: id,
         staffMemberId: String(formData.get("staffMemberId") || "") || undefined,
         scheduledAt: scheduledAt ? new Date(String(scheduledAt)) : undefined,
         instructions: String(formData.get("siteVisitInstructions") || "") || undefined,
-      });
-      await updateSiteVisitStatus({
-        connectionId: id,
-        status: formData.get("siteVisitStatus") as SiteVisitStatus,
       });
     });
   }
@@ -608,6 +614,7 @@ export default async function ConnectionDetailPage({
     </Card>
   );
 
+  const siteVisitAssignmentLocked = connection.siteVisitStatus === "COMPLETED";
   const siteVisitSection = (
     <div className="space-y-6">
       <Card>
@@ -617,7 +624,21 @@ export default async function ConnectionDetailPage({
             <Badge variant="secondary">{connection.siteVisitStatus.replace(/_/g, " ")}</Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
+          <ActionForm action={siteVisitStatusAction} successMessage="Status updated" disableUntilChanged>
+            <SiteVisitStatusField
+              key={connection.updatedAt.getTime()}
+              initialStatus={connection.siteVisitStatus}
+              canCompleteSiteVisit={canCompleteSiteVisit}
+            />
+          </ActionForm>
+
+          {siteVisitAssignmentLocked && (
+            <p className="text-xs text-muted-foreground">
+              Site visit is marked Completed, so the assignment can no longer be edited. Change the status above
+              to edit it again.
+            </p>
+          )}
           <ActionForm
             action={siteVisitAssignmentAction}
             successMessage="Site visit assignment saved"
@@ -628,10 +649,9 @@ export default async function ConnectionDetailPage({
               key={connection.updatedAt.getTime()}
               staff={staff}
               initialStaffMemberId={connection.staffMemberId}
-              initialStatus={connection.siteVisitStatus}
               initialScheduledAt={datetimeLocalValue(connection.siteVisitScheduledAt)}
               initialInstructions={connection.siteVisitInstructions ?? ""}
-              canCompleteSiteVisit={canCompleteSiteVisit}
+              locked={siteVisitAssignmentLocked}
             />
           </ActionForm>
         </CardContent>
