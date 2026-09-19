@@ -54,9 +54,9 @@ export function computeConnectionStage(input: StageInput): ConnectionStageKey {
  * non-final quote that was actually sent to the customer while another quote
  * has since been finalized (kept only as read-only history — a fresh/unsent
  * Draft stays editable regardless, since that's exactly how a new comparison
- * quote is built), or it IS the final quotation and the job has genuinely
- * entered Subsidy/Loan processing or later — editable any time before that,
- * even once Approved. */
+ * quote is built), or it's the final quotation and has been Approved —
+ * fields freeze the moment it's accepted, not just once the job reaches
+ * Subsidy/Loan or later. */
 export function isEstimateLocked(input: {
   status: string;
   isCurrent: boolean;
@@ -68,7 +68,8 @@ export function isEstimateLocked(input: {
     if (input.status === "DRAFT") return false;
     return input.hasOtherFinalEstimate;
   }
-  if (input.isCurrent && input.connectionStage !== null) {
+  if (input.status === "ACCEPTED") return true;
+  if (input.connectionStage !== null) {
     return STAGE_ORDER.indexOf(input.connectionStage) >= STAGE_ORDER.indexOf("subsidyloan");
   }
   return false;
