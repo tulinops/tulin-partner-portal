@@ -581,6 +581,9 @@ export async function recordInstallationSignOff(input: { connectionId: string; s
   await db.$transaction(async (tx) => {
     const connection = await tx.connection.findFirst({ where: { id: input.connectionId } });
     if (!connection) throw new Error("Connection not found");
+    if (connection.installationStatus === "COMPLETED") {
+      throw new Error("Installation is already marked Completed — change the status above to sign off again");
+    }
 
     await tx.connection.update({
       where: { id: input.connectionId },

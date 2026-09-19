@@ -1135,26 +1135,32 @@ export default async function ConnectionDetailPage({
           </div>
 
           <ActionForm action={signOffAction} successMessage="Installation signed off" className="grid gap-4 border-t pt-4 sm:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="signedOffByName">Signed off by</Label>
-              <Input
-                id="signedOffByName"
-                name="signedOffByName"
-                defaultValue={connection.installationSignedOffByName ?? ""}
-                placeholder="Customer's name"
-              />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="installationNotes">Notes</Label>
-              <Textarea id="installationNotes" name="installationNotes" defaultValue={connection.installationNotes ?? ""} />
-            </div>
-            <div>
-              <SubmitButton>Mark installation complete</SubmitButton>
-            </div>
+            <fieldset disabled={equipmentLocked} className="contents">
+              <div className="space-y-2">
+                <Label htmlFor="signedOffByName">Signed off by</Label>
+                <Input
+                  id="signedOffByName"
+                  name="signedOffByName"
+                  defaultValue={connection.installationSignedOffByName ?? ""}
+                  placeholder="Customer's name"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="installationNotes">Notes</Label>
+                <Textarea id="installationNotes" name="installationNotes" defaultValue={connection.installationNotes ?? ""} />
+              </div>
+            </fieldset>
+            {!equipmentLocked && (
+              <div>
+                <SubmitButton>Mark installation complete</SubmitButton>
+              </div>
+            )}
             {connection.installationSignedOffAt && (
               <p className="text-xs text-muted-foreground sm:col-span-3">
-                Signed off {connection.installationSignedOffAt.toLocaleDateString("en-IN")}. Completing this
-                auto-creates warranty records from the equipment list, using sensible default periods you can edit.
+                Signed off {connection.installationSignedOffAt.toLocaleDateString("en-IN")}.
+                {equipmentLocked
+                  ? " Change the status above to sign off again (e.g. after adding equipment)."
+                  : " Completing this auto-creates warranty records from the equipment list, using sensible default periods you can edit."}
               </p>
             )}
           </ActionForm>
